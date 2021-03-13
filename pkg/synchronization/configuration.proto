@@ -116,5 +116,8 @@ message Configuration {
     // propagation mode.
     string defaultGroup = 66;
 
-    // Fields 67-80 are reserved for future permission configuration parameters.
+    // SshPrivateKeyPath specifies a fixed private key to use for SSH
+    string sshPrivateKeyPath = 67;
+
+    // Fields 68-80 are reserved for future permission configuration parameters.
 }
