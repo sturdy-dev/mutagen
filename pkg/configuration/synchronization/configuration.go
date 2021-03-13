@@ -64,6 +64,7 @@ type Configuration struct {
 		// permission propagation mode.
 		DefaultGroup string `yaml:"defaultGroup"`
 	} `yaml:"permissions"`
+	SSHPrivateKeyPath string `yaml:"sshPrivateKeyPath"`
 }
 
 // Configuration converts a YAML-based session configuration to a Protocol
@@ -86,5 +87,6 @@ func (c *Configuration) Configuration() *synchronization.Configuration {
 		DefaultDirectoryMode:   uint32(c.Permissions.DefaultDirectoryMode),
 		DefaultOwner:           c.Permissions.DefaultOwner,
 		DefaultGroup:           c.Permissions.DefaultGroup,
+		SshPrivateKeyPath:      c.SSHPrivateKeyPath,
 	}
 }

@@ -294,6 +294,13 @@ func MergeConfigurations(lower, higher *Configuration) *Configuration {
 		result.DefaultGroup = lower.DefaultGroup
 	}
 
+	// Merge SshPrivateKeyPath
+	if higher.SshPrivateKeyPath != "" {
+		result.SshPrivateKeyPath = higher.SshPrivateKeyPath
+	} else {
+		result.SshPrivateKeyPath = lower.SshPrivateKeyPath
+	}
+
 	// Done.
 	return result
 }
