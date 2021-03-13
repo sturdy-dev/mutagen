@@ -37,15 +37,18 @@ type sshTransport struct {
 	port uint16
 	// prompter is the prompter identifier to use for prompting.
 	prompter string
+	// privateKeyFilePath is the private key to use for SSH
+	privateKeyFilePath string
 }
 
 // NewTransport creates a new SSH transport using the specified parameters.
-func NewTransport(user, host string, port uint16, prompter string) (agent.Transport, error) {
+func NewTransport(user, host string, port uint16, prompter, privateKeyFilePath string) (agent.Transport, error) {
 	return &sshTransport{
-		user:     user,
-		host:     host,
-		port:     port,
-		prompter: prompter,
+		user:               user,
+		host:               host,
+		port:               port,
+		prompter:           prompter,
+		privateKeyFilePath: privateKeyFilePath,
 	}, nil
 }
 
@@ -144,6 +147,9 @@ func (t *sshTransport) Command(command string) (*exec.Cmd, error) {
 	sshArguments = append(sshArguments, ssh.ServerAliveFlags(serverAliveIntervalSeconds, serverAliveCountMax)...)
 	if t.port != 0 {
 		sshArguments = append(sshArguments, "-p", fmt.Sprintf("%d", t.port))
+	}
+	if t.privateKeyFilePath != "" {
+		sshArguments = append(sshArguments, "-i", t.privateKeyFilePath)
 	}
 	sshArguments = append(sshArguments, target, command)
 

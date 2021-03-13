@@ -61,7 +61,8 @@ func (p *protocolHandler) Connect(
 	}
 
 	// Create an SSH agent transport.
-	transport, err := ssh.NewTransport(url.User, url.Host, uint16(url.Port), prompter)
+	// TODO: Support SSH Private Key here?
+	transport, err := ssh.NewTransport(url.User, url.Host, uint16(url.Port), prompter, "")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create SSH transport: %w", err)
 	}
