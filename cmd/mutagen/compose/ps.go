@@ -32,7 +32,7 @@ func listSessions(project *compose.Project) error {
 
 	// Perform synchronization session listing.
 	fmt.Println("\nSynchronization sessions")
-	if err := sync.ListWithSelection(daemonConnection, projectSelection, false); err != nil {
+	if err := sync.ListWithSelection(daemonConnection, projectSelection, false, false); err != nil {
 		return fmt.Errorf("synchronization listing failed: %w", err)
 	}
 
