@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -162,6 +163,7 @@ func ListWithSelection(
 	daemonConnection *grpc.ClientConn,
 	selection *selection.Selection,
 	long bool,
+	printJson bool,
 ) error {
 	// Perform the list operation.
 	synchronizationService := synchronizationsvc.NewSynchronizationClient(daemonConnection)
@@ -173,6 +175,15 @@ func ListWithSelection(
 		return grpcutil.PeelAwayRPCErrorLayer(err)
 	} else if err = response.EnsureValid(); err != nil {
 		return fmt.Errorf("invalid list response received: %w", err)
+	}
+
+	if printJson {
+		output, err := json.Marshal(response.SessionStates)
+		if err != nil {
+			return fmt.Errorf("failed to convert to JSON: %w", err)
+		}
+		fmt.Println(string(output))
+		return nil
 	}
 
 	// Handle output based on whether or not any sessions were returned.
@@ -226,7 +237,7 @@ func listMain(_ *cobra.Command, arguments []string) error {
 	defer daemonConnection.Close()
 
 	// Perform the list operation and print status information.
-	return ListWithSelection(daemonConnection, selection, listConfiguration.long)
+	return ListWithSelection(daemonConnection, selection, listConfiguration.long, listConfiguration.json)
 }
 
 // listCommand is the list command.
@@ -246,6 +257,8 @@ var listConfiguration struct {
 	// labelSelector encodes a label selector to be used in identifying which
 	// sessions should be paused.
 	labelSelector string
+	// print as json
+	json bool
 }
 
 func init() {
@@ -262,4 +275,5 @@ func init() {
 	// Wire up list flags.
 	flags.BoolVarP(&listConfiguration.long, "long", "l", false, "Show detailed session information")
 	flags.StringVar(&listConfiguration.labelSelector, "label-selector", "", "List sessions matching the specified label selector")
+	flags.BoolVarP(&listConfiguration.json, "json", "", false, "Print output as JSON")
 }
