@@ -12,7 +12,7 @@ import (
 const (
 	// MutagenDataDirectoryName is the name of the global Mutagen data directory
 	// inside the user's home directory.
-	MutagenDataDirectoryName = ".mutagen"
+	MutagenDataDirectoryName = ".sturdy-sync"
 
 	// MutagenDataDirectoryDevelopmentName is the name of the global Mutagen
 	// data directory inside the user's home directory for development builds of
