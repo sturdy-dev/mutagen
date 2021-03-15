@@ -6,8 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"google.golang.org/protobuf/proto"
+	"log"
 
 	"github.com/mutagen-io/mutagen/pkg/compression"
 	"github.com/mutagen-io/mutagen/pkg/encoding"
@@ -17,6 +16,8 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/endpoint/local"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // endpointServer wraps a local endpoint instances and dispatches requests to
@@ -69,6 +70,14 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		return err
 	} else {
 		request.Root = r
+	}
+
+	// Validate that the user has access to this path
+	if err := sturdyValidateRoot(request.Root, sturdyApiValidateRoot); err != nil {
+		err := fmt.Errorf("invalid view or codebase: %w", err)
+		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+		log.Println(err)
+		return err
 	}
 
 	// Create the underlying endpoint. If it fails to create, then send a
