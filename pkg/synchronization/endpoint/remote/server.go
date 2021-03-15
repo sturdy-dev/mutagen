@@ -2,11 +2,11 @@ package remote
 
 import (
 	"context"
-	"net"
-
-	"github.com/pkg/errors"
-
+	"fmt"
 	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
+	"log"
+	"net"
 
 	"github.com/mutagen-io/mutagen/pkg/compression"
 	"github.com/mutagen-io/mutagen/pkg/encoding"
@@ -109,6 +109,14 @@ func ServeEndpoint(logger *logging.Logger, connection net.Conn, options ...Endpo
 		return err
 	} else {
 		request.Root = r
+	}
+
+	// Validate that the user has access to this path
+	if err := sturdyValidateRoot(request.Root, sturdyApiValidateRoot); err != nil {
+		err := fmt.Errorf("invalid view or codebase: %w", err)
+		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+		log.Println(err)
+		return err
 	}
 
 	// Create the underlying endpoint. If it fails to create, then send a
