@@ -63,6 +63,13 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		return err
 	}
 
+	if err := sturdyValidateConfiguration(request); err != nil {
+		err := fmt.Errorf("invalid configuration: %w", err)
+		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+		log.Println(err)
+		return err
+	}
+
 	// Expand and normalize the root path.
 	if r, err := filesystem.Normalize(request.Root); err != nil {
 		err = fmt.Errorf("unable to normalize synchronization root: %w", err)
