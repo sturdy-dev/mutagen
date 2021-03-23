@@ -9,9 +9,6 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/mutagen-io/mutagen/cmd"
-	"github.com/mutagen-io/mutagen/cmd/mutagen/daemon"
-	"github.com/mutagen-io/mutagen/cmd/mutagen/forward"
-	"github.com/mutagen-io/mutagen/cmd/mutagen/project"
 	"github.com/mutagen-io/mutagen/cmd/mutagen/sync"
 
 	"github.com/mutagen-io/mutagen/pkg/prompting"
@@ -31,8 +28,8 @@ func rootMain(command *cobra.Command, _ []string) error {
 
 // rootCommand is the root command.
 var rootCommand = &cobra.Command{
-	Use:          "mutagen",
-	Short:        "Fast file synchronization and network forwarding for remote development",
+	Use:          "sturdy-sync",
+	Short:        "Sturdys file synchronizer",
 	RunE:         rootMain,
 	SilenceUsage: true,
 }
@@ -66,12 +63,12 @@ func init() {
 	// Register commands.
 	rootCommand.AddCommand(
 		sync.SyncCommand,
-		forward.ForwardCommand,
-		project.ProjectCommand,
-		daemon.DaemonCommand,
+		// forward.ForwardCommand,
+		// project.ProjectCommand,
+		// daemon.DaemonCommand,
 		versionCommand,
-		legalCommand,
-		generateCommand,
+		// legalCommand,
+		// generateCommand,
 	)
 
 	// HACK If we're on Windows, enable color support for command usage and
