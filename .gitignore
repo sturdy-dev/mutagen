@@ -6,3 +6,7 @@
 
 # Project lock files
 *.lock
+sturdy-sync-*
+/mutagen
+cmd/mutagen-agent/mutagen-agent
+.idea
