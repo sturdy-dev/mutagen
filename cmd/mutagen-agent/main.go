@@ -59,11 +59,11 @@ func init() {
 	// Register commands. We do this here (rather than in individual init
 	// functions) so that we can control the order.
 	rootCommand.AddCommand(
-		installCommand,
+		// installCommand,
 		synchronizerCommand,
-		forwarderCommand,
-		versionCommand,
-		legalCommand,
+		// forwarderCommand,
+		// versionCommand,
+		// legalCommand,
 	)
 }
 
