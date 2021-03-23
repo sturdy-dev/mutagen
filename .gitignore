@@ -1,2 +1,12 @@
 # Build output
 /build/
+
+# Tunnel credentials
+*.tunn
+
+# Project lock files
+*.lock
+sturdy-sync-*
+/mutagen
+cmd/mutagen-agent/mutagen-agent
+.idea
