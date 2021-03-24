@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/mutagen-io/mutagen/cmd/mutagen/daemon"
 	"os"
 	"runtime"
 
@@ -64,6 +65,7 @@ func init() {
 	// Register commands.
 	rootCommand.AddCommand(
 		sync.SyncCommand,
+		daemon.DaemonCommand,
 		versionCommand,
 	)
 
