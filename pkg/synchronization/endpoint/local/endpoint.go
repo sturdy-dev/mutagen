@@ -4,6 +4,7 @@ import (
 	"context"
 	"hash"
 	"io"
+	"log"
 	"path/filepath"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/filesystem/behavior"
 	"github.com/mutagen-io/mutagen/pkg/filesystem/watching"
 	"github.com/mutagen-io/mutagen/pkg/logging"
+	"github.com/mutagen-io/mutagen/pkg/sturdy"
 	"github.com/mutagen-io/mutagen/pkg/synchronization"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
@@ -1288,6 +1290,21 @@ func (e *endpoint) Transition(ctx context.Context, transitions []*core.Change) (
 		e.decomposesUnicode,
 		e.stager,
 	)
+
+	var paths []string
+	for _, t := range transitions {
+		paths = append(paths, t.Path)
+		log.Printf("transition: %s/%s --> %+v", e.root, t.Path, t)
+	}
+	for _, r := range results {
+		log.Printf("transition result: %+v", r)
+	}
+
+	err := sturdy.SyncTransitions(e.root, paths)
+	if err != nil {
+		log.Println(err)
+		// TODO: how should we deal with failures?
+	}
 
 	// In case there's a recursive watching Goroutine that doesn't currently
 	// have a watch established (due to non-existence of the synchronization
