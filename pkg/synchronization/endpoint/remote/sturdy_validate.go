@@ -1,31 +1,22 @@
 package remote
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
+	"github.com/mutagen-io/mutagen/pkg/sturdy"
+	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 	"log"
-	"net/http"
 	"os"
-	"path"
-	"strings"
 )
 
 type sturdyValidateViewer func(codebaseID, viewID string) error
 
 func sturdyValidateRoot(root string, sturdyValFunc sturdyValidateViewer) error {
-	root = path.Clean(root)
-	parts := strings.Split(root, "/")
-
-	if len(parts) != 4 {
-		return fmt.Errorf("unknown number of paths")
-	}
-
-	if parts[0] != "" || parts[1] != "repos" {
+	codebaseID, viewID, err := sturdy.ParseCodebaseViewPath(root)
+	if err != nil {
 		return fmt.Errorf("invalid path")
 	}
 
-	err := sturdyValFunc(parts[2], parts[3])
+	err = sturdyValFunc(codebaseID, viewID)
 	if err != nil {
 		return err
 	}
@@ -40,33 +31,20 @@ func sturdyApiValidateRoot(codebaseID, viewID string) error {
 		UserID     string `json:"user_id"`
 	}
 
-	apiAddr := os.Getenv("STURDY_API_ADDR")
-	if len(apiAddr) == 0 {
-		return fmt.Errorf("could not get STURDY_API_ADDR")
-	}
-
 	userID := os.Getenv("STURDY_AUTHENTICATED_USER_ID")
-	if len(apiAddr) == 0 {
+	if len(userID) == 0 {
 		log.Println("could not get STURDY_AUTHENTICATED_USER_ID")
 		return fmt.Errorf("could not get STURDY_AUTHENTICATED_USER_ID")
 	}
 
-	data, err := json.Marshal(validateRequest{
+	var res struct{}
+	err := api.Request("/v3/mutagen/validate-view", validateRequest{
 		UserID:     userID,
 		ViewID:     viewID,
 		CodebaseID: codebaseID,
-	})
+	}, &res)
 	if err != nil {
-		return fmt.Errorf("could not create request: %w", err)
-	}
-
-	resp, err := http.Post(apiAddr+"/v3/mutagen/validate-view", "application/json", bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("could not make request: %w", err)
-	}
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("unauthorized")
+		return fmt.Errorf("validate view failed: %w", err)
 	}
 
 	return nil
