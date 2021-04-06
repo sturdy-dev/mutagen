@@ -109,6 +109,19 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		return fmt.Errorf("unable to send initialize response: %w", err)
 	}
 
+	// Ping view to indicate connectedness
+	done := make(chan bool)
+	go func() {
+		if err := sturdyPingView(request.Root, sturdyApiValidateRoot, done); err != nil {
+			err := fmt.Errorf("invalid view or codebase: %w", err)
+			encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+			log.Println(err)
+		}
+	}()
+	defer func() {
+		done <- true
+	}()
+
 	// Create the server.
 	server := &endpointServer{
 		endpoint: endpoint,
