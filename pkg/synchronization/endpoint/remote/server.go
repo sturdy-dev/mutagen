@@ -4,10 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
-	"log"
-	"net"
-
 	"github.com/mutagen-io/mutagen/pkg/compression"
 	"github.com/mutagen-io/mutagen/pkg/encoding"
 	"github.com/mutagen-io/mutagen/pkg/filesystem"
@@ -16,6 +12,9 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/endpoint/local"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
+	"github.com/pkg/errors"
+	"log"
+	"net"
 )
 
 // endpointServer wraps a local endpoint instances and dispatches requests to
@@ -190,22 +189,27 @@ func (s *endpointServer) serve() error {
 
 		// Handle the request based on type.
 		if request.Poll != nil {
+			log.Printf("POLL: %s", request.Poll)
 			if err := s.servePoll(request.Poll); err != nil {
 				return errors.Wrap(err, "unable to serve poll request")
 			}
 		} else if request.Scan != nil {
+			log.Printf("SCAN: %s", request.Scan)
 			if err := s.serveScan(request.Scan); err != nil {
 				return errors.Wrap(err, "unable to serve scan request")
 			}
 		} else if request.Stage != nil {
+			log.Printf("STAGAE: %s", request.Stage)
 			if err := s.serveStage(request.Stage); err != nil {
 				return errors.Wrap(err, "unable to serve stage request")
 			}
 		} else if request.Supply != nil {
+			log.Printf("SUPPLY: %s", request.Supply)
 			if err := s.serveSupply(request.Supply); err != nil {
 				return errors.Wrap(err, "unable to serve supply request")
 			}
 		} else if request.Transition != nil {
+			log.Printf("TRANSITION: %s", request.Transition)
 			if err := s.serveTransition(request.Transition); err != nil {
 				return errors.Wrap(err, "unable to serve transition request")
 			}
