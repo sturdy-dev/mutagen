@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/hashicorp/yamux v0.0.0-20190923154419-df201c70410d
 	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
-	github.com/mattn/go-isatty v0.0.12
+	github.com/mattn/go-isatty v0.0.13
 	github.com/mutagen-io/extstat v0.0.0-20210224131814-32fa3f057fa8
 	github.com/mutagen-io/fsevents v0.0.0-20180903111129-10556809b434
 	github.com/mutagen-io/gopass v0.0.0-20170602182606-9a121bec1ae7
@@ -22,7 +22,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59 // indirect
 	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7 // indirect
-	golang.org/x/sys v0.0.0-20210223212115-eede4237b368
+	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf
 	golang.org/x/text v0.3.5
 	google.golang.org/grpc v1.34.0
 	google.golang.org/protobuf v1.25.0
