@@ -32,6 +32,18 @@ func SturdyLogState(s *State) {
 	// The state is quite chatty, and we don't need to know all intermediate states.
 	// Debouncing here to report the state at most once per second for each session.
 	debouncesMx.Lock()
+
+	// Nothing in queue, send right away
+	if len(states) == 0 || true {
+		log.Println("SturdyLogState Debounce : EMPTY QUEUE")
+		states <- s
+		debouncesMx.Unlock()
+		return
+	}
+
+	log.Println("SturdyLogState Debounce : USING DEBOUNCE")
+
+	// Debounce
 	fn, ok := debounces[s.Session.Identifier]
 	if !ok {
 		debounces[s.Session.Identifier] = debounce.New(time.Second)
@@ -118,9 +130,28 @@ func reportState(s *State) error {
 	if err != nil {
 		return err
 	}
+
+	// Build connection url from the session labels
+	// Default to https://api.getsturdy.com:443 for backwards compatability with sessions created before sturdy v0.5.18
+	var proto = "https"
+	var host = "api.getsturdy.com"
+	var port = "443"
+	if lHost, ok := s.Session.Labels["sturdyApiHost"]; ok {
+		host = lHost
+	}
+	if lPort, ok := s.Session.Labels["sturdyApiHostPort"]; ok && len(lPort) > 0 {
+		port = lPort
+		if lPort == "443" {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+
 	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
 	defer cancelFunc()
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.getsturdy.com/v3/mutagen/update-status", bytes.NewReader(data))
+
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s://%s:%s/v3/mutagen/update-status", proto, host, port), bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
