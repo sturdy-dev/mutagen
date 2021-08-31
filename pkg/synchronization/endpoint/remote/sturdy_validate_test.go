@@ -13,13 +13,13 @@ func TestSturdyValidateRoot(t *testing.T) {
 		{"/repos/foo/bar", nil},
 		{"/repos/foo/not-bar", fmt.Errorf("invalid from api")}, // not valid by api lookup
 
-		{"/repos/../foo/bar", fmt.Errorf("unknown number of paths")},
+		{"/repos/../foo/bar", fmt.Errorf("invalid path")},
 		{"/repos/../foo/bar/xoxox", fmt.Errorf("invalid path")},
-		{"/repos/../../../../foo/bar", fmt.Errorf("unknown number of paths")},
+		{"/repos/../../../../foo/bar", fmt.Errorf("invalid path")},
 		{"/etc/foo/bar", fmt.Errorf("invalid path")},
 	}
 
-	validateCodebaseView := func(codebaseID, viewID string) error {
+	validateCodebaseView := func(codebaseID, viewID string, isNewConnection bool) error {
 		if codebaseID == "foo" && viewID == "bar" {
 			return nil
 		}
