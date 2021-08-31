@@ -34,14 +34,11 @@ func SturdyLogState(s *State) {
 	debouncesMx.Lock()
 
 	// Nothing in queue, send right away
-	if len(states) == 0 || true {
-		log.Println("SturdyLogState Debounce : EMPTY QUEUE")
+	if len(states) == 0 {
 		states <- s
 		debouncesMx.Unlock()
 		return
 	}
-
-	log.Println("SturdyLogState Debounce : USING DEBOUNCE")
 
 	// Debounce
 	fn, ok := debounces[s.Session.Identifier]
