@@ -1226,7 +1226,17 @@ func (e *endpoint) Stage(paths []string, digests [][]byte) ([]string, []*rsync.S
 
 // Supply implements the supply method for local endpoints.
 func (e *endpoint) Supply(paths []string, signatures []*rsync.Signature, receiver rsync.Receiver) error {
-	return rsync.Transmit(e.root, paths, signatures, receiver)
+	res := rsync.Transmit(e.root, paths, signatures, receiver)
+
+	// This is a Supply request, and not a Transition.
+	// TODO: Rename the API
+	err := sturdy.SyncTransitions(e.root, paths)
+	if err != nil {
+		log.Println(err)
+		// TODO: how should we deal with failures?
+	}
+
+	return res
 }
 
 // Transition implements the Transition method for local endpoints.
