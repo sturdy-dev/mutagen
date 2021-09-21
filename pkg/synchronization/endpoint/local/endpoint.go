@@ -983,12 +983,19 @@ func (e *endpoint) Poll(context context.Context) error {
 // scan lock.
 func (e *endpoint) scan(ctx context.Context, baseline *core.Entry, recheckPaths map[string]bool) error {
 	// Perform a full (warm) scan, watching for errors.
+
+	// Fetch dynamic part of ignore files from sturdy server.
+	ignores, err := sturdy.ListIgnores(ctx, e.root)
+	if err != nil {
+		return fmt.Errorf("failed to list ignores: %w", err)
+	}
+
 	snapshot, preservesExecutability, decomposesUnicode, newCache, newIgnoreCache, err := core.Scan(
 		ctx,
 		e.root,
 		baseline, recheckPaths,
 		e.hasher, e.cache,
-		e.ignores, e.ignoreCache,
+		append(ignores, e.ignores...), core.IgnoreCache{},
 		e.probeMode,
 		e.symbolicLinkMode,
 	)

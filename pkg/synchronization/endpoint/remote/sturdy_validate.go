@@ -2,12 +2,13 @@ package remote
 
 import (
 	"fmt"
-	"github.com/mutagen-io/mutagen/pkg/sturdy"
-	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 	"log"
 	"math/rand"
 	"os"
 	"time"
+
+	"github.com/mutagen-io/mutagen/pkg/sturdy"
+	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 )
 
 type sturdyValidateViewer func(codebaseID, viewID string, isNewConnection bool) error
@@ -41,7 +42,7 @@ func sturdyApiValidateRoot(codebaseID, viewID string, isNewConnection bool) erro
 	}
 
 	var res struct{}
-	err := api.Request("/v3/mutagen/validate-view", validateRequest{
+	err := api.Post("/v3/mutagen/validate-view", validateRequest{
 		UserID:          userID,
 		ViewID:          viewID,
 		CodebaseID:      codebaseID,

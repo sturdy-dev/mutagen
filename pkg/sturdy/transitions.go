@@ -2,6 +2,7 @@ package sturdy
 
 import (
 	"fmt"
+
 	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 )
 
@@ -18,7 +19,7 @@ func SyncTransitions(root string, paths []string) error {
 	}
 
 	var res struct{}
-	err = api.Request("/v3/mutagen/sync-transitions", SyncTransitionsRequest{
+	err = api.Post("/v3/mutagen/sync-transitions", SyncTransitionsRequest{
 		Paths:      paths,
 		CodebaseID: codebaseID,
 		ViewID:     viewID,
