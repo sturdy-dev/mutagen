@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -107,6 +108,8 @@ func newSession(
 	// Update status.
 	prompting.Message(prompter, "Creating session...")
 
+	log.Printf("new session: session labels: %+v", labels)
+
 	// Set the session version.
 	version := Version_Version1
 
@@ -146,6 +149,7 @@ func newSession(
 			version,
 			mergedAlphaConfiguration,
 			true,
+			labels,
 		)
 		if err != nil {
 			logger.Info("Alpha connection failure:", err)
@@ -161,6 +165,7 @@ func newSession(
 			version,
 			mergedBetaConfiguration,
 			false,
+			labels,
 		)
 		if err != nil {
 			logger.Info("Beta connection failure:", err)
@@ -411,6 +416,8 @@ func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockH
 	// Update status.
 	prompting.Message(prompter, fmt.Sprintf("Resuming session %s...", c.session.Identifier))
 
+	log.Printf("resume: labels: %+v", c.session.Labels)
+
 	// If not already held, acquire the lifecycle lock and defer its release.
 	if !lifecycleLockHeld {
 		c.lifecycleLock.Lock()
@@ -477,6 +484,7 @@ func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockH
 		c.session.Version,
 		c.mergedAlphaConfiguration,
 		true,
+		c.session.Labels,
 	)
 	c.stateLock.Lock()
 	c.state.AlphaConnected = (alpha != nil)
@@ -496,6 +504,7 @@ func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockH
 		c.session.Version,
 		c.mergedBetaConfiguration,
 		false,
+		c.session.Labels,
 	)
 	c.stateLock.Lock()
 	c.state.BetaConnected = (beta != nil)
@@ -663,6 +672,7 @@ var (
 // synchronization.
 func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 	// Defer resource and state cleanup.
+
 	defer func() {
 		// Shutdown any endpoints. These might be non-nil if the runloop was
 		// cancelled while partially connected rather than after sync failure.
@@ -709,6 +719,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 					c.session.Version,
 					c.mergedAlphaConfiguration,
 					true,
+					c.session.Labels,
 				)
 			}
 			c.stateLock.Lock()
@@ -738,6 +749,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 					c.session.Version,
 					c.mergedBetaConfiguration,
 					false,
+					c.session.Labels,
 				)
 			}
 			c.stateLock.Lock()
