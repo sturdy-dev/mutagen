@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"path/filepath"
 	"sync"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/filesystem/behavior"
 	"github.com/mutagen-io/mutagen/pkg/filesystem/watching"
 	"github.com/mutagen-io/mutagen/pkg/logging"
+	"github.com/mutagen-io/mutagen/pkg/sturdy"
+	sturdy_context "github.com/mutagen-io/mutagen/pkg/sturdy/context"
 	"github.com/mutagen-io/mutagen/pkg/synchronization"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
@@ -181,6 +184,10 @@ type endpoint struct {
 	// stager will only be used in at most one of Stage or Transition methods at
 	// any given time.
 	stager *stager
+	// Labels are mutagen labels. It is populated for in the mutagen context,
+	// for the mutagen-ssh it is nil.
+	// This field is static and thus safe for concurrent reads.
+	labels map[string]string
 }
 
 // NewEndpoint creates a new local endpoint instance using the specified session
@@ -192,6 +199,7 @@ func NewEndpoint(
 	version synchronization.Version,
 	configuration *synchronization.Configuration,
 	alpha bool,
+	labels map[string]string,
 ) (synchronization.Endpoint, error) {
 	// Determine if the endpoint is running in a read-only mode.
 	synchronizationMode := configuration.SynchronizationMode
@@ -366,6 +374,7 @@ func NewEndpoint(
 			version.Hasher(),
 			maximumStagingFileSize,
 		),
+		labels: labels,
 	}
 
 	// Start the cache saving Goroutine and monitor for its completion.
@@ -981,12 +990,19 @@ func (e *endpoint) Poll(context context.Context) error {
 // scan lock.
 func (e *endpoint) scan(ctx context.Context, baseline *core.Entry, recheckPaths map[string]bool) error {
 	// Perform a full (warm) scan, watching for errors.
+
+	// Fetch dynamic part of ignore files from sturdy server.
+	ignores, err := sturdy.ListIgnores(sturdy_context.WithLabels(ctx, e.labels), e.root)
+	if err != nil {
+		return fmt.Errorf("failed to list ignores: %w", err)
+	}
+
 	snapshot, preservesExecutability, decomposesUnicode, newCache, newIgnoreCache, err := core.Scan(
 		ctx,
 		e.root,
 		baseline, recheckPaths,
 		e.hasher, e.cache,
-		e.ignores, e.ignoreCache,
+		append(ignores, e.ignores...), core.IgnoreCache{},
 		e.probeMode,
 		e.symbolicLinkMode,
 	)
@@ -1209,7 +1225,17 @@ func (e *endpoint) Stage(paths []string, digests [][]byte) ([]string, []*rsync.S
 
 // Supply implements the supply method for local endpoints.
 func (e *endpoint) Supply(paths []string, signatures []*rsync.Signature, receiver rsync.Receiver) error {
-	return rsync.Transmit(e.root, paths, signatures, receiver)
+	res := rsync.Transmit(e.root, paths, signatures, receiver)
+
+	// This is a Supply request, and not a Transition.
+	// TODO: Rename the API
+	err := sturdy.SyncTransitions(e.root, paths)
+	if err != nil {
+		log.Println(err)
+		// TODO: how should we deal with failures?
+	}
+
+	return res
 }
 
 // Transition implements the Transition method for local endpoints.
@@ -1273,6 +1299,21 @@ func (e *endpoint) Transition(ctx context.Context, transitions []*core.Change) (
 		e.decomposesUnicode,
 		e.stager,
 	)
+
+	var paths []string
+	for _, t := range transitions {
+		paths = append(paths, t.Path)
+		log.Printf("transition: %s/%s --> %+v", e.root, t.Path, t)
+	}
+	for _, r := range results {
+		log.Printf("transition result: %+v", r)
+	}
+
+	err := sturdy.SyncTransitions(e.root, paths)
+	if err != nil {
+		log.Println(err)
+		// TODO: how should we deal with failures?
+	}
 
 	// In case there's a recursive watching Goroutine that doesn't currently
 	// have a watch established (due to non-existence of the synchronization

@@ -37,6 +37,7 @@ func (h *protocolHandler) Connect(
 	version synchronization.Version,
 	configuration *synchronization.Configuration,
 	alpha bool,
+	labels map[string]string,
 ) (synchronization.Endpoint, error) {
 	// Verify that the URL is of the correct kind and protocol.
 	if url.Kind != urlpkg.Kind_Synchronization {
@@ -54,7 +55,7 @@ func (h *protocolHandler) Connect(
 	}
 
 	// Create an SSH agent transport.
-	transport, err := ssh.NewTransport(url.User, url.Host, uint16(url.Port), prompter)
+	transport, err := ssh.NewTransport(url.User, url.Host, uint16(url.Port), prompter, configuration.SshPrivateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create SSH transport: %w", err)
 	}

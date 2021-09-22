@@ -6,8 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	"google.golang.org/protobuf/proto"
+	"log"
 
 	"github.com/mutagen-io/mutagen/pkg/compression"
 	"github.com/mutagen-io/mutagen/pkg/encoding"
@@ -17,6 +16,8 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/endpoint/local"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
+
+	"google.golang.org/protobuf/proto"
 )
 
 // endpointServer wraps a local endpoint instances and dispatches requests to
@@ -62,6 +63,13 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		return err
 	}
 
+	if err := sturdyValidateConfiguration(request); err != nil {
+		err := fmt.Errorf("invalid configuration: %w", err)
+		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+		log.Println(err)
+		return err
+	}
+
 	// Expand and normalize the root path.
 	if r, err := filesystem.Normalize(request.Root); err != nil {
 		err = fmt.Errorf("unable to normalize synchronization root: %w", err)
@@ -69,6 +77,14 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		return err
 	} else {
 		request.Root = r
+	}
+
+	// Validate that the user has access to this path
+	if err := sturdyValidateRoot(request.Root, sturdyApiValidateRoot); err != nil {
+		err := fmt.Errorf("invalid view or codebase: %w", err)
+		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+		log.Println(err)
+		return err
 	}
 
 	// Create the underlying endpoint. If it fails to create, then send a
@@ -80,6 +96,7 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		request.Version,
 		request.Configuration,
 		request.Alpha,
+		nil,
 	)
 	if err != nil {
 		err = fmt.Errorf("unable to create underlying endpoint: %w", err)
@@ -92,6 +109,19 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 	if err = encoder.Encode(&InitializeSynchronizationResponse{}); err != nil {
 		return fmt.Errorf("unable to send initialize response: %w", err)
 	}
+
+	// Ping view to indicate connectedness
+	done := make(chan bool)
+	go func() {
+		if err := sturdyPingView(request.Root, sturdyApiValidateRoot, done); err != nil {
+			err := fmt.Errorf("invalid view or codebase: %w", err)
+			encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
+			log.Println(err)
+		}
+	}()
+	defer func() {
+		done <- true
+	}()
 
 	// Create the server.
 	server := &endpointServer{
@@ -121,22 +151,27 @@ func (s *endpointServer) serve() error {
 
 		// Handle the request based on type.
 		if request.Poll != nil {
+			log.Printf("POLL: %s", request.Poll)
 			if err := s.servePoll(request.Poll); err != nil {
 				return fmt.Errorf("unable to serve poll request: %w", err)
 			}
 		} else if request.Scan != nil {
+			log.Printf("SCAN: %s", request.Scan)
 			if err := s.serveScan(request.Scan); err != nil {
 				return fmt.Errorf("unable to serve scan request: %w", err)
 			}
 		} else if request.Stage != nil {
+			log.Printf("STAGAE: %s", request.Stage)
 			if err := s.serveStage(request.Stage); err != nil {
 				return fmt.Errorf("unable to serve stage request: %w", err)
 			}
 		} else if request.Supply != nil {
+			log.Printf("SUPPLY: %s", request.Supply)
 			if err := s.serveSupply(request.Supply); err != nil {
 				return fmt.Errorf("unable to serve supply request: %w", err)
 			}
 		} else if request.Transition != nil {
+			log.Printf("TRANSITION: %s", request.Transition)
 			if err := s.serveTransition(request.Transition); err != nil {
 				return fmt.Errorf("unable to serve transition request: %w", err)
 			}

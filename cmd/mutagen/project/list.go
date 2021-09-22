@@ -119,7 +119,7 @@ func listMain(_ *cobra.Command, _ []string) error {
 
 	// List synchronization sessions.
 	fmt.Println("Synchronization sessions:")
-	if err := sync.ListWithSelection(daemonConnection, selection, listConfiguration.long); err != nil {
+	if err := sync.ListWithSelection(daemonConnection, selection, listConfiguration.long, false); err != nil {
 		return fmt.Errorf("unable to list synchronization session(s): %w", err)
 	}
 
