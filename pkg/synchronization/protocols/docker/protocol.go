@@ -37,6 +37,7 @@ func (h *protocolHandler) Connect(
 	version synchronization.Version,
 	configuration *synchronization.Configuration,
 	alpha bool,
+	labels map[string]string,
 ) (synchronization.Endpoint, error) {
 	// Verify that the URL is of the correct kind and protocol.
 	if url.Kind != urlpkg.Kind_Synchronization {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	
+
 	"github.com/mutagen-io/mutagen/pkg/compression"
 	"github.com/mutagen-io/mutagen/pkg/encoding"
 	"github.com/mutagen-io/mutagen/pkg/filesystem"
@@ -96,6 +96,7 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		request.Version,
 		request.Configuration,
 		request.Alpha,
+		nil,
 	)
 	if err != nil {
 		err = fmt.Errorf("unable to create underlying endpoint: %w", err)
