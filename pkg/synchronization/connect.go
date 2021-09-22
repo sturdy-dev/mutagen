@@ -23,6 +23,7 @@ type ProtocolHandler interface {
 		version Version,
 		configuration *Configuration,
 		alpha bool,
+		labels map[string]string,
 	) (Endpoint, error)
 }
 
@@ -40,6 +41,7 @@ func connect(
 	version Version,
 	configuration *Configuration,
 	alpha bool,
+	labels map[string]string,
 ) (Endpoint, error) {
 	// Local the appropriate protocol handler.
 	handler, ok := ProtocolHandlers[url.Protocol]
@@ -50,7 +52,7 @@ func connect(
 	}
 
 	// Dispatch the dialing.
-	endpoint, err := handler.Connect(ctx, logger, url, prompter, session, version, configuration, alpha)
+	endpoint, err := handler.Connect(ctx, logger, url, prompter, session, version, configuration, alpha, labels)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to endpoint: %w", err)
 	}

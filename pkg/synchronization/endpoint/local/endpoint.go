@@ -17,6 +17,7 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/filesystem/watching"
 	"github.com/mutagen-io/mutagen/pkg/logging"
 	"github.com/mutagen-io/mutagen/pkg/sturdy"
+	sturdy_context "github.com/mutagen-io/mutagen/pkg/sturdy/context"
 	"github.com/mutagen-io/mutagen/pkg/synchronization"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
@@ -183,6 +184,10 @@ type endpoint struct {
 	// stager will only be used in at most one of Stage or Transition methods at
 	// any given time.
 	stager *stager
+	// Labels are mutagen labels. It is populated for in the mutagen context,
+	// for the mutagen-ssh it is nil.
+	// This field is static and thus safe for concurrent reads.
+	labels map[string]string
 }
 
 // NewEndpoint creates a new local endpoint instance using the specified session
@@ -194,6 +199,7 @@ func NewEndpoint(
 	version synchronization.Version,
 	configuration *synchronization.Configuration,
 	alpha bool,
+	labels map[string]string,
 ) (synchronization.Endpoint, error) {
 	// Determine if the endpoint is running in a read-only mode.
 	synchronizationMode := configuration.SynchronizationMode
@@ -368,6 +374,7 @@ func NewEndpoint(
 			version.Hasher(),
 			maximumStagingFileSize,
 		),
+		labels: labels,
 	}
 
 	// Start the cache saving Goroutine and monitor for its completion.
@@ -985,7 +992,7 @@ func (e *endpoint) scan(ctx context.Context, baseline *core.Entry, recheckPaths 
 	// Perform a full (warm) scan, watching for errors.
 
 	// Fetch dynamic part of ignore files from sturdy server.
-	ignores, err := sturdy.ListIgnores(ctx, e.root)
+	ignores, err := sturdy.ListIgnores(sturdy_context.WithLabels(ctx, e.labels), e.root)
 	if err != nil {
 		return fmt.Errorf("failed to list ignores: %w", err)
 	}
