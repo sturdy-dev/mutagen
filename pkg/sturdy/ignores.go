@@ -20,7 +20,6 @@ func ListIgnores(ctx context.Context, root string) (ignores []string, err error)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("fetching ignores for view %s\n", viewID)
 
 	var res struct {
 		Ignores []string `json:"ignores"`
@@ -30,7 +29,6 @@ func ListIgnores(ctx context.Context, root string) (ignores []string, err error)
 	if err := api.Get(ctx, url, &res); err != nil {
 		return nil, err
 	}
-	log.Printf("ignores for view %s: %+v\n", viewID, res.Ignores)
 
 	ignores = res.Ignores
 	return ignores, err
