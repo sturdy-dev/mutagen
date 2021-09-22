@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -107,8 +106,6 @@ func newSession(
 ) (*controller, error) {
 	// Update status.
 	prompting.Message(prompter, "Creating session...")
-
-	log.Printf("new session: session labels: %+v", labels)
 
 	// Set the session version.
 	version := Version_Version1
@@ -415,8 +412,6 @@ func (c *controller) flush(ctx context.Context, prompter string, skipWait bool) 
 func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockHeld bool) error {
 	// Update status.
 	prompting.Message(prompter, fmt.Sprintf("Resuming session %s...", c.session.Identifier))
-
-	log.Printf("resume: labels: %+v", c.session.Labels)
 
 	// If not already held, acquire the lifecycle lock and defer its release.
 	if !lifecycleLockHeld {

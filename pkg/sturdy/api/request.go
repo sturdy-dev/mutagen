@@ -29,6 +29,9 @@ func getAPIAddr(ctx context.Context) string {
 	proto := labels["sturdyApiProto"]
 	host := labels["sturdyApiHost"]
 	port := labels["sturdyApiHostPort"]
+	if port == "" {
+		return fmt.Sprintf("%s://%s", proto, host)
+	}
 	return fmt.Sprintf("%s://%s:%s", proto, host, port)
 }
 

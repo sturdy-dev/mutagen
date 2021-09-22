@@ -3,16 +3,24 @@ package sturdy
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 	sturdy_context "github.com/mutagen-io/mutagen/pkg/sturdy/context"
 )
 
-func ListIgnores(ctx context.Context, root string) ([]string, error) {
+func ListIgnores(ctx context.Context, root string) (ignores []string, err error) {
+	defer func() {
+		if err != nil {
+			log.Printf("fetching ignores failed: %s\n", err)
+		}
+	}()
+
 	viewID, err := viewID(ctx, root)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("fetching ignores for view %s\n", viewID)
 
 	var res struct {
 		Ignores []string `json:"ignores"`
@@ -22,8 +30,10 @@ func ListIgnores(ctx context.Context, root string) ([]string, error) {
 	if err := api.Get(ctx, url, &res); err != nil {
 		return nil, err
 	}
+	log.Printf("ignores for view %s: %+v\n", viewID, res.Ignores)
 
-	return res.Ignores, nil
+	ignores = res.Ignores
+	return ignores, err
 }
 
 func viewID(ctx context.Context, root string) (string, error) {
