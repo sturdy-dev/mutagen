@@ -4,13 +4,8 @@ package core
 // directories.
 var DefaultVCSIgnores = []string{
 	".git/",
-	".git/**/*",
 	".svn/",
-	".svn/**/*",
 	".hg/",
-	".hg/**/*",
 	".bzr/",
-	".bzr/**/*",
 	"_darcs/",
-	"_darcs/**/*",
 }

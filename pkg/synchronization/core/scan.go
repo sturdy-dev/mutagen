@@ -391,6 +391,20 @@ func (s *scanner) directory(
 			continue
 		}
 
+		// Determine whether or not this path is ignored and update the new
+		// ignore cache. If the path is ignored, then record an untracked entry.
+		contentIsDirectory := contentKind == EntryKind_Directory
+		ignoreCacheKey := IgnoreCacheKey{contentPath, contentIsDirectory}
+		ignored, ok := s.ignoreCache[ignoreCacheKey]
+		if !ok {
+			ignored = s.ignorer.ignored(contentPath, contentIsDirectory)
+		}
+		s.newIgnoreCache[ignoreCacheKey] = ignored
+		if ignored {
+			contents[contentName] = &Entry{Kind: EntryKind_Untracked}
+			continue
+		}
+
 		// If we have a baseline, then check if that baseline has content with
 		// the same name and kind as what we see on disk. If so, then we can use
 		// that as a baseline for the content.
@@ -443,32 +457,7 @@ func (s *scanner) directory(
 			return nil, err
 		}
 
-		// Determine whether or not this path is ignored and update the new
-		// ignore cache. If the path is ignored, then record an untracked entry.
-		contentIsDirectory := contentKind == EntryKind_Directory
-		ignoreCacheKey := IgnoreCacheKey{contentPath, contentIsDirectory}
-		ignored, ok := s.ignoreCache[ignoreCacheKey]
-		if !ok {
-			ignored = s.ignorer.ignored(contentPath, contentIsDirectory)
-
-			// always track directories with tracked content
-			if ignored && contentIsDirectory {
-				for _, e := range entry.Contents {
-					if e.Kind != EntryKind_Untracked {
-						ignored = false
-						break
-					}
-				}
-			}
-		}
-
-		s.newIgnoreCache[ignoreCacheKey] = ignored
-		if ignored {
-			contents[contentName] = &Entry{Kind: EntryKind_Untracked}
-			continue
-		}
-
-		// Record the tracked content.
+		// Record the content.
 		contents[contentName] = entry
 	}
 
