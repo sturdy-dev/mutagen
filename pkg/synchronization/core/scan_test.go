@@ -458,6 +458,7 @@ func TestScan(t *testing.T) {
 				test.ignores, nil,
 				behavior.ProbeMode_ProbeModeProbe,
 				test.symbolicLinkMode,
+				nil,
 			)
 			if test.expectFailure {
 				if err == nil {
@@ -510,6 +511,7 @@ func TestScan(t *testing.T) {
 				test.ignores, ignoreCache,
 				behavior.ProbeMode_ProbeModeProbe,
 				test.symbolicLinkMode,
+				nil,
 			)
 
 			// Handle scan failure (which isn't expected at this point).
@@ -567,6 +569,7 @@ func TestScan(t *testing.T) {
 				test.ignores, ignoreCache,
 				behavior.ProbeMode_ProbeModeProbe,
 				test.symbolicLinkMode,
+				nil,
 			)
 
 			// Handle scan failure (which isn't expected at this point).
@@ -651,6 +654,7 @@ func TestScan(t *testing.T) {
 				test.ignores, ignoreCache,
 				behavior.ProbeMode_ProbeModeProbe,
 				test.symbolicLinkMode,
+				nil,
 			)
 
 			// Handle scan failure (which isn't expected at this point).
@@ -737,6 +741,7 @@ func TestScanCrossFilesystemBoundary(t *testing.T) {
 		nil,
 		behavior.ProbeMode_ProbeModeProbe,
 		SymbolicLinkMode_SymbolicLinkModePortable,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unable to perform scan: %v", err)
