@@ -69,7 +69,7 @@ func Post(endpoint string, request, response interface{}) error {
 }
 
 func Get(ctx context.Context, endpoint string, response interface{}) error {
-	apiAddr = getAPIAddr(ctx)
+	apiAddr := getAPIAddr(ctx)
 	if apiAddr == "" {
 		return fmt.Errorf("api address is not defined")
 	}
