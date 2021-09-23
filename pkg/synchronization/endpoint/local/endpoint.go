@@ -1038,22 +1038,22 @@ func (e *endpoint) Poll(context context.Context) error {
 // updates the endpoint scan parameters. The caller must hold the endpoint's
 // scan lock.
 func (e *endpoint) scan(ctx context.Context, baseline *core.Entry, recheckPaths map[string]bool) error {
-	// Perform a full (warm) scan, watching for errors.
-
-	// Fetch dynamic part of ignore files from sturdy server.
-	ignores, err := sturdy.ListIgnores(sturdy_context.WithLabels(ctx, e.labels), e.root)
+	// Fetch dynamic allows from the sturdy api server.
+	allows, err := sturdy.ListAllows(sturdy_context.WithLabels(ctx, e.labels), e.root)
 	if err != nil {
-		return fmt.Errorf("failed to list ignores: %w", err)
+		return fmt.Errorf("failed to list allows: %w", err)
 	}
 
+	// Perform a full (warm) scan, watching for errors.
 	snapshot, preservesExecutability, decomposesUnicode, newCache, newIgnoreCache, err := core.Scan(
 		ctx,
 		e.root,
 		baseline, recheckPaths,
 		e.hasher, e.cache,
-		append(ignores, e.ignores...), core.IgnoreCache{},
+		e.ignores, e.ignoreCache,
 		e.probeMode,
 		e.symbolicLinkMode,
+		allows,
 	)
 	if err != nil {
 		return err

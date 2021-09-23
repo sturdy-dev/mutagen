@@ -124,6 +124,8 @@ type scanner struct {
 	// preservesExecutability indicates whether or not the synchronization root
 	// filesystem preserves POSIX executability bits.
 	preservesExecutability bool
+	// allower is the allower identifying allowed paths.
+	allower *allower
 }
 
 // file performs processing of a file entry. Exactly one of parent or file will
@@ -405,6 +407,14 @@ func (s *scanner) directory(
 			continue
 		}
 
+		// Determine wether or noth this path is allowed. If the path is not allowed,
+		// then record an untracked entry.
+		allowed := s.allower.allowed(contentPath, contentIsDirectory)
+		if !allowed {
+			contents[contentName] = &Entry{Kind: EntryKind_Untracked}
+			continue
+		}
+
 		// If we have a baseline, then check if that baseline has content with
 		// the same name and kind as what we see on disk. If so, then we can use
 		// that as a baseline for the content.
@@ -481,6 +491,7 @@ func Scan(
 	ignoreCache IgnoreCache,
 	probeMode behavior.ProbeMode,
 	symbolicLinkMode SymbolicLinkMode,
+	allows []string,
 ) (*Entry, bool, bool, *Cache, IgnoreCache, error) {
 	// Verify that the symbolic link mode is valid for this platform.
 	if symbolicLinkMode == SymbolicLinkMode_SymbolicLinkModePOSIXRaw && runtime.GOOS == "windows" {
@@ -664,6 +675,12 @@ func Scan(
 		return nil, false, false, nil, nil, fmt.Errorf("unable to create ignorer: %w", err)
 	}
 
+	// Create the allower.
+	allower, err := newAllower(allows)
+	if err != nil {
+		return nil, false, false, nil, nil, fmt.Errorf("unable to create allower: %w", err)
+	}
+
 	// Create a new cache to populate. Estimate its capacity based on the
 	// existing cache length. If the existing cache is empty, create one with
 	// the default capacity.
@@ -700,6 +717,7 @@ func Scan(
 		deviceID:               metadata.DeviceID,
 		recomposeUnicode:       decomposesUnicode,
 		preservesExecutability: preservesExecutability,
+		allower:                allower,
 	}
 
 	// Handle the scan based on the root type.
