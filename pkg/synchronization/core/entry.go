@@ -213,7 +213,14 @@ func (e *Entry) Equal(other *Entry, deep bool) bool {
 	// recursively. This includes the case where both pointers are nil, which
 	// represents the absence of content. If only one pointer is nil, then they
 	// can't possibly be equal.
+	//
+	// Sturdy: make nil and untracked entry equal. This makes sure that directories with
+	// untracked content are syncronized and no conflict arises between them.
 	if e == other {
+		return true
+	} else if e == nil && other != nil && other.Kind == EntryKind_Untracked {
+		return true
+	} else if other == nil && e != nil && e.Kind == EntryKind_Untracked {
 		return true
 	} else if e == nil || other == nil {
 		return false
