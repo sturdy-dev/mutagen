@@ -188,6 +188,9 @@ type endpoint struct {
 	// for the mutagen-ssh it is nil.
 	// This field is static and thus safe for concurrent reads.
 	labels map[string]string
+	// previousAllows is the previously known state for the allows list
+	// Can be used as a fallback if fetching a new allow list fails
+	previousAllows []string
 }
 
 // NewEndpoint creates a new local endpoint instance using the specified session
@@ -991,8 +994,14 @@ func (e *endpoint) Poll(context context.Context) error {
 func (e *endpoint) scan(ctx context.Context, baseline *core.Entry, recheckPaths map[string]bool) error {
 	// Fetch dynamic allows from the sturdy api server.
 	allows, err := sturdy.ListAllows(sturdy_context.WithLabels(ctx, e.labels), e.root)
-	if err != nil {
+	if err == nil {
+		e.previousAllows = allows
+	} else if err != nil && e.previousAllows == nil {
 		return fmt.Errorf("failed to list allows: %w", err)
+	} else {
+		// fallback to the previous list of allows if a new list could not be fetched
+		e.logger.Warning("reusing existing allows")
+		allows = e.previousAllows
 	}
 
 	// Perform a full (warm) scan, watching for errors.
