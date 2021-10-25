@@ -13,6 +13,7 @@ import (
 )
 
 var apiAddr string
+var clientVersion = "development"
 
 func init() {
 	apiAddr = os.Getenv("STURDY_API_ADDR")
@@ -45,23 +46,29 @@ func Post(endpoint string, request, response interface{}) error {
 		return fmt.Errorf("could not create request: %w", err)
 	}
 
-	resp, err := http.Post(apiAddr+endpoint, "application/json", bytes.NewReader(data))
+	req, err := http.NewRequest(http.MethodPost, apiAddr+endpoint, bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("could not make request: %w", err)
 	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("User-Agent", clientVersion)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("could not send request: %w", err)
+	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("unauthorized")
 	}
 
-	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("could not read response: %w", err)
 	}
 
-	err = json.Unmarshal(body, &response)
-	if err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
 		return fmt.Errorf("could not unmarshal response: %w", err)
 	}
 
@@ -78,24 +85,24 @@ func Get(ctx context.Context, endpoint string, response interface{}) error {
 	if err != nil {
 		return fmt.Errorf("could not make request: %w", err)
 	}
+	req.Header.Add("User-Agent", clientVersion)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send request: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("unauthorized")
 	}
 
-	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("could not read response: %w", err)
 	}
 
-	err = json.Unmarshal(body, &response)
-	if err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
 		return fmt.Errorf("could not unmarshal response: %w", err)
 	}
 
