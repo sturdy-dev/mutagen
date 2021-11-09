@@ -13,4 +13,8 @@ enum Version {
     Invalid = 0;
     // Version1 represents session version 1.
     Version1 = 1;
+    // Version25 represents session version 25.
+    // This is a sturdy version. It is exacly the same as version 1, expect for the hashing algorithm used.
+    // Version25 uses SHA256 instead of SHA1 to enable comparision with git-lfs files.
+    Version25 = 25;
 }

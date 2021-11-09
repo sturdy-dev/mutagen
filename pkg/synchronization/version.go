@@ -2,6 +2,7 @@ package synchronization
 
 import (
 	"crypto/sha1"
+	"crypto/sha256"
 	"hash"
 	"math"
 
@@ -13,7 +14,7 @@ import (
 // Supported indicates whether or not the session version is supported.
 func (v Version) Supported() bool {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return true
 	default:
 		return false
@@ -25,6 +26,8 @@ func (v Version) Hasher() hash.Hash {
 	switch v {
 	case Version_Version1:
 		return sha1.New()
+	case Version_Version25:
+		return sha256.New()
 	default:
 		panic("unknown or unsupported session version")
 	}
@@ -34,7 +37,7 @@ func (v Version) Hasher() hash.Hash {
 // session version.
 func (v Version) DefaultSynchronizationMode() core.SynchronizationMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return core.SynchronizationMode_SynchronizationModeTwoWaySafe
 	default:
 		panic("unknown or unsupported session version")
@@ -45,7 +48,7 @@ func (v Version) DefaultSynchronizationMode() core.SynchronizationMode {
 // session version.
 func (v Version) DefaultMaximumEntryCount() uint64 {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return math.MaxUint64
 	default:
 		panic("unknown or unsupported session version")
@@ -56,7 +59,7 @@ func (v Version) DefaultMaximumEntryCount() uint64 {
 // for the session version.
 func (v Version) DefaultMaximumStagingFileSize() uint64 {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return math.MaxUint64
 	default:
 		panic("unknown or unsupported session version")
@@ -66,7 +69,7 @@ func (v Version) DefaultMaximumStagingFileSize() uint64 {
 // DefaultProbeMode returns the default probe mode for the session version.
 func (v Version) DefaultProbeMode() behavior.ProbeMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return behavior.ProbeMode_ProbeModeProbe
 	default:
 		panic("unknown or unsupported session version")
@@ -76,7 +79,7 @@ func (v Version) DefaultProbeMode() behavior.ProbeMode {
 // DefaultScanMode returns the default scan mode for the session version.
 func (v Version) DefaultScanMode() ScanMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return ScanMode_ScanModeAccelerated
 	default:
 		panic("unknown or unsupported session version")
@@ -86,7 +89,7 @@ func (v Version) DefaultScanMode() ScanMode {
 // DefaultStageMode returns the default staging mode for the session version.
 func (v Version) DefaultStageMode() StageMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return StageMode_StageModeMutagen
 	default:
 		panic("unknown or unsupported session version")
@@ -97,7 +100,7 @@ func (v Version) DefaultStageMode() StageMode {
 // session version.
 func (v Version) DefaultSymbolicLinkMode() core.SymbolicLinkMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return core.SymbolicLinkMode_SymbolicLinkModePortable
 	default:
 		panic("unknown or unsupported session version")
@@ -107,7 +110,7 @@ func (v Version) DefaultSymbolicLinkMode() core.SymbolicLinkMode {
 // DefaultWatchMode returns the default watch mode for the session version.
 func (v Version) DefaultWatchMode() WatchMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return WatchMode_WatchModePortable
 	default:
 		panic("unknown or unsupported session version")
@@ -118,7 +121,7 @@ func (v Version) DefaultWatchMode() WatchMode {
 // the session version.
 func (v Version) DefaultWatchPollingInterval() uint32 {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return 10
 	default:
 		panic("unknown or unsupported session version")
@@ -129,7 +132,7 @@ func (v Version) DefaultWatchPollingInterval() uint32 {
 // version.
 func (v Version) DefaultIgnoreVCSMode() core.IgnoreVCSMode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return core.IgnoreVCSMode_IgnoreVCSModePropagate
 	default:
 		panic("unknown or unsupported session version")
@@ -140,7 +143,7 @@ func (v Version) DefaultIgnoreVCSMode() core.IgnoreVCSMode {
 // version.
 func (v Version) DefaultFileMode() filesystem.Mode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return filesystem.ModePermissionUserRead |
 			filesystem.ModePermissionUserWrite
 	default:
@@ -152,7 +155,7 @@ func (v Version) DefaultFileMode() filesystem.Mode {
 // session version.
 func (v Version) DefaultDirectoryMode() filesystem.Mode {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return filesystem.ModePermissionUserRead |
 			filesystem.ModePermissionUserWrite |
 			filesystem.ModePermissionUserExecute
@@ -165,7 +168,7 @@ func (v Version) DefaultDirectoryMode() filesystem.Mode {
 // session version.
 func (v Version) DefaultOwnerSpecification() string {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return ""
 	default:
 		panic("unknown or unsupported session version")
@@ -176,7 +179,7 @@ func (v Version) DefaultOwnerSpecification() string {
 // the session version.
 func (v Version) DefaultGroupSpecification() string {
 	switch v {
-	case Version_Version1:
+	case Version_Version1, Version_Version25:
 		return ""
 	default:
 		panic("unknown or unsupported session version")

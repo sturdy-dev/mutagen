@@ -108,7 +108,7 @@ func newSession(
 	prompting.Message(prompter, "Creating session...")
 
 	// Set the session version.
-	version := Version_Version1
+	version := Version_Version25
 
 	// Compute the creation time and check that it's valid for Protocol Buffers.
 	creationTime := timestamppb.Now()
