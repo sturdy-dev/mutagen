@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/mutagen-io/mutagen/pkg/filesystem"
 	"github.com/mutagen-io/mutagen/pkg/filesystem/behavior"
+	"github.com/mutagen-io/mutagen/pkg/lfs"
 	"github.com/mutagen-io/mutagen/pkg/stream"
 )
 
@@ -185,30 +187,45 @@ func (s *scanner) file(
 			defer file.Close()
 		}
 
-		// Reset the hash state.
-		s.hasher.Reset()
-
-		// Copy data into the hash and verify that we copied the amount
-		// expected. We use a preemptable wrapper around the hasher to enable
-		// timely cancellation.
-		preemptableHasher := stream.NewPreemptableWriter(s.hasher, s.cancelled, scannerCopyPreemptionInterval)
-		if copied, err := io.CopyBuffer(preemptableHasher, file, s.copyBuffer); err != nil {
-			if err == stream.ErrWritePreempted {
-				return nil, errScanCancelled
+		// Try to decode file as a lfs pointer.
+		lfsPointer, file, lfsDecodeError := lfs.DecodeFrom(file)
+		if lfsDecodeError == nil {
+			// If the file is an LFS pointer, then we don't need to compute it's digest, we'll user then
+			// the LFS pointer's digest instead.
+			oidDigest, err := hex.DecodeString(lfsPointer.Oid)
+			if err != nil {
+				return &Entry{
+					Kind:    EntryKind_Problematic,
+					Problem: fmt.Errorf("unable to decode LFS pointer digest: %w", err).Error(),
+				}, nil
 			}
-			return &Entry{
-				Kind:    EntryKind_Problematic,
-				Problem: fmt.Errorf("unable to hash file contents: %w", err).Error(),
-			}, nil
-		} else if uint64(copied) != metadata.Size {
-			return &Entry{
-				Kind:    EntryKind_Problematic,
-				Problem: fmt.Sprintf("hashed size mismatch: %d != %d", copied, metadata.Size),
-			}, nil
-		}
+			digest = oidDigest
+		} else {
+			// Reset the hash state.
+			s.hasher.Reset()
 
-		// Compute the digest.
-		digest = s.hasher.Sum(nil)
+			// Copy data into the hash and verify that we copied the amount
+			// expected. We use a preemptable wrapper around the hasher to enable
+			// timely cancellation.
+			preemptableHasher := stream.NewPreemptableWriter(s.hasher, s.cancelled, scannerCopyPreemptionInterval)
+			if copied, err := io.CopyBuffer(preemptableHasher, file, s.copyBuffer); err != nil {
+				if err == stream.ErrWritePreempted {
+					return nil, errScanCancelled
+				}
+				return &Entry{
+					Kind:    EntryKind_Problematic,
+					Problem: fmt.Errorf("unable to hash file contents: %w", err).Error(),
+				}, nil
+			} else if uint64(copied) != metadata.Size {
+				return &Entry{
+					Kind:    EntryKind_Problematic,
+					Problem: fmt.Sprintf("hashed size mismatch: %d != %d", copied, metadata.Size),
+				}, nil
+			}
+
+			// Compute the digest.
+			digest = s.hasher.Sum(nil)
+		}
 	}
 
 	// Add an entry to the new cache.
