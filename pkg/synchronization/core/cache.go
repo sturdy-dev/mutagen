@@ -89,6 +89,8 @@ func (c *Cache) Equal(other *Cache) bool {
 type ReverseLookupMap struct {
 	// map20 provides mappings for SHA-1 hashes.
 	map20 map[[20]byte]string
+	// map32 provides mappings for SHA-256 hashes.
+	map32 map[[32]byte]string
 }
 
 // Lookup attempts a lookup in the map.
@@ -101,6 +103,16 @@ func (m *ReverseLookupMap) Lookup(digest []byte) (string, bool) {
 
 		// Attempt a lookup.
 		result, ok := m.map20[key]
+
+		// Done.
+		return result, ok
+	} else if len(digest) == 32 {
+		// Create a key.
+		var key [32]byte
+		copy(key[:], digest)
+
+		// Attempt a lookup.
+		result, ok := m.map32[key]
 
 		// Done.
 		return result, ok
@@ -123,8 +135,11 @@ func (c *Cache) GenerateReverseLookupMap() (*ReverseLookupMap, error) {
 		// Compute and validate the digest size and allocate the map.
 		if digestSize == -1 {
 			digestSize = len(e.Digest)
+
 			if digestSize == 20 {
 				result.map20 = make(map[[20]byte]string, len(c.Entries))
+			} else if digestSize == 32 {
+				result.map32 = make(map[[32]byte]string, len(c.Entries))
 			} else {
 				return nil, errors.New("unsupported digest size")
 			}
@@ -137,6 +152,10 @@ func (c *Cache) GenerateReverseLookupMap() (*ReverseLookupMap, error) {
 			var key [20]byte
 			copy(key[:], e.Digest)
 			result.map20[key] = p
+		} else if digestSize == 32 {
+			var key [32]byte
+			copy(key[:], e.Digest)
+			result.map32[key] = p
 		} else {
 			panic("invalid digest size allowed")
 		}
