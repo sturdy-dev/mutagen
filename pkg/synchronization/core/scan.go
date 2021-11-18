@@ -188,7 +188,7 @@ func (s *scanner) file(
 		}
 
 		// Try to decode file as a lfs pointer.
-		lfsPointer, file, lfsDecodeError := lfs.DecodeFrom(file)
+		lfsPointer, file, lfsDecodeError := lfs.DecodeFrom(metadata, file)
 		if lfsDecodeError == nil {
 			// If the file is an LFS pointer, then we don't need to compute it's digest, we'll user then
 			// the LFS pointer's digest instead.

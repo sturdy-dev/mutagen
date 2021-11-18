@@ -11,9 +11,10 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mutagen-io/mutagen/pkg/filesystem"
 )
 
 const (
@@ -39,43 +40,20 @@ var (
 )
 
 type Pointer struct {
-	Version    string
-	Oid        string
-	Size       int64
-	OidType    string
-	Extensions []*PointerExtension
-	Canonical  bool
+	Version   string
+	Oid       string
+	Size      int64
+	OidType   string
+	Canonical bool
 }
 
 // A PointerExtension is parsed from the Git LFS Pointer file.
-type PointerExtension struct {
-	Name     string
-	Priority int
-	Oid      string
-	OidType  string
-}
-
-type ByPriority []*PointerExtension
-
-func (p ByPriority) Len() int           { return len(p) }
-func (p ByPriority) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p ByPriority) Less(i, j int) bool { return p[i].Priority < p[j].Priority }
-
-func NewPointer(oid string, size int64, exts []*PointerExtension) *Pointer {
-	return &Pointer{latest, oid, size, oidType, exts, true}
-}
-
-func NewPointerExtension(name string, priority int, oid string) *PointerExtension {
-	return &PointerExtension{name, priority, oid, oidType}
+func NewPointer(oid string, size int64) *Pointer {
+	return &Pointer{latest, oid, size, oidType, true}
 }
 
 func EmptyPointer() *Pointer {
-	return NewPointer(emptyObjectSHA256, 0, nil)
-}
-
-func DecodePointer(reader io.Reader) (*Pointer, error) {
-	p, _, err := DecodeFrom(reader)
-	return p, err
+	return NewPointer(emptyObjectSHA256, 0)
 }
 
 func (p *Pointer) Encoded() string {
@@ -85,9 +63,6 @@ func (p *Pointer) Encoded() string {
 
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("version %s\n", latest))
-	for _, ext := range p.Extensions {
-		buffer.WriteString(fmt.Sprintf("ext-%d-%s %s:%s\n", ext.Priority, ext.Name, ext.OidType, ext.Oid))
-	}
 	buffer.WriteString(fmt.Sprintf("oid %s:%s\n", p.OidType, p.Oid))
 	buffer.WriteString(fmt.Sprintf("size %d\n", p.Size))
 	return buffer.String()
@@ -99,7 +74,11 @@ func (p *Pointer) Encoded() string {
 //
 // If the pointer could not be decoded, an io.Reader containing the entire
 // blob's data will be returned, along with a parse error.
-func DecodeFrom(reader io.Reader) (*Pointer, io.Reader, error) {
+func DecodeFrom(meta *filesystem.Metadata, reader io.Reader) (*Pointer, io.Reader, error) {
+	if meta.Size < blobSizeCutoff {
+		return nil, reader, fmt.Errorf("file not big enough")
+	}
+
 	buf := make([]byte, blobSizeCutoff)
 	n, err := reader.Read(buf)
 	buf = buf[:n]
@@ -139,7 +118,7 @@ func verifyVersion(version string) error {
 }
 
 func decodeKV(data []byte) (*Pointer, error) {
-	kvps, exts, err := decodeKVData(data)
+	kvps, err := decodeKVData(data)
 	if err != nil {
 		return nil, err
 	}
@@ -158,28 +137,13 @@ func decodeKV(data []byte) (*Pointer, error) {
 		return nil, err
 	}
 
-	value, ok = kvps["size"]
+	value = kvps["size"]
 	size, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || size < 0 {
 		return nil, fmt.Errorf("invalid size: %q", value)
 	}
 
-	var extensions []*PointerExtension
-	if exts != nil {
-		for key, value := range exts {
-			ext, err := parsePointerExtension(key, value)
-			if err != nil {
-				return nil, err
-			}
-			extensions = append(extensions, ext)
-		}
-		if err = validatePointerExtensions(extensions); err != nil {
-			return nil, err
-		}
-		sort.Sort(ByPriority(extensions))
-	}
-
-	return NewPointer(oid, size, extensions), nil
+	return NewPointer(oid, size), nil
 }
 
 func parseOid(value string) (string, error) {
@@ -197,39 +161,7 @@ func parseOid(value string) (string, error) {
 	return oid, nil
 }
 
-func parsePointerExtension(key string, value string) (*PointerExtension, error) {
-	keyParts := strings.SplitN(key, "-", 3)
-	if len(keyParts) != 3 || keyParts[0] != "ext" {
-		return nil, errors.New("Invalid extension value: " + value)
-	}
-
-	p, err := strconv.Atoi(keyParts[1])
-	if err != nil || p < 0 {
-		return nil, errors.New("Invalid priority: " + keyParts[1])
-	}
-
-	name := keyParts[2]
-
-	oid, err := parseOid(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewPointerExtension(name, p, oid), nil
-}
-
-func validatePointerExtensions(exts []*PointerExtension) error {
-	m := make(map[int]struct{})
-	for _, ext := range exts {
-		if _, exist := m[ext.Priority]; exist {
-			return fmt.Errorf("duplicate priority found: %d", ext.Priority)
-		}
-		m[ext.Priority] = struct{}{}
-	}
-	return nil
-}
-
-func decodeKVData(data []byte) (kvps map[string]string, exts map[string]string, err error) {
+func decodeKVData(data []byte) (kvps map[string]string, err error) {
 	kvps = make(map[string]string)
 
 	if !matcherRE.Match(data) {
@@ -265,10 +197,6 @@ func decodeKVData(data []byte) (kvps map[string]string, exts map[string]string, 
 				err = fmt.Errorf("expected %s, got %s", expected, key)
 				return
 			}
-			if exts == nil {
-				exts = make(map[string]string)
-			}
-			exts[key] = value
 			continue
 		}
 
