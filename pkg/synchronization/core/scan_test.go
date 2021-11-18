@@ -419,296 +419,301 @@ func TestScan(t *testing.T) {
 	// Process test cases for every filesystem.
 	for _, filesystem := range testingFilesystems {
 		for _, test := range tests {
-			// Check if this test is skipped on this platform or filesystem.
-			if test.skip != nil && test.skip(filesystem) {
-				continue
-			}
+			t.Run(test.description, func(t *testing.T) {
 
-			// Generate content for this test.
-			generator := &testingContentManager{
-				storage:            filesystem.storage,
-				baseline:           test.baseline,
-				baselineContentMap: test.baselineContentMap,
-				tweak:              test.tweak,
-				untweak:            test.untweak,
-			}
-			root, err := generator.generate()
-			if err != nil {
-				t.Errorf("%s: unable to generate test content on %s filesystem: %v",
-					test.description, filesystem.name, err,
-				)
-				continue
-			}
+				// Check if this test is skipped on this platform or filesystem.
+				if test.skip != nil && test.skip(filesystem) {
+					return
+				}
 
-			// Define a cleanup function that will report errors.
-			cleanup := func() {
-				if err := generator.remove(); err != nil {
-					t.Errorf("%s: unable to remove test content on %s filesystem: %v",
+				// Generate content for this test.
+				generator := &testingContentManager{
+					storage:            filesystem.storage,
+					baseline:           test.baseline,
+					baselineContentMap: test.baselineContentMap,
+					tweak:              test.tweak,
+					untweak:            test.untweak,
+				}
+				root, err := generator.generate()
+				if err != nil {
+
+					t.Errorf("%s: unable to generate test content on %s filesystem: %v",
 						test.description, filesystem.name, err,
 					)
+					return
 				}
-			}
 
-			// Perform a cold scan and handle failure cases.
-			snapshot, preservesExecutability, decomposesUnicode, cache, ignoreCache, err := Scan(
-				test.context,
-				root,
-				nil, nil,
-				hasher, nil,
-				test.ignores, nil,
-				behavior.ProbeMode_ProbeModeProbe,
-				test.symbolicLinkMode,
-				nil,
-			)
-			if test.expectFailure {
-				if err == nil {
-					t.Errorf("%s: cold scan succeeded unexpectedly on %s filesystem",
-						test.description, filesystem.name,
-					)
-				}
-				cleanup()
-				continue
-			} else if err != nil {
-				t.Errorf("%s: cold scan failed on %s filesystem: %v",
-					test.description, filesystem.name, err,
-				)
-				cleanup()
-				continue
-			}
-
-			// Propagate executability if the filesystem doesn't preserve it.
-			if !preservesExecutability {
-				snapshot = PropagateExecutability(nil, test.expected, snapshot)
-			}
-
-			// Check scan results.
-			if !snapshot.Equal(test.expected, true) {
-				t.Errorf("%s: cold scan result not equal to expected on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if cache == nil {
-				t.Errorf("%s: nil cache returned by cold scan on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-
-			// Create a proxy hasher to track re-hashing.
-			rescanHasher := &testHashingDetector{
-				hasher, func() {
-					t.Errorf("%s: hashing occurred on warm scan on %s filesystem",
-						test.description, filesystem.name,
-					)
-				},
-			}
-
-			// Perform a warm (but non-accelerated) scan.
-			newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err := Scan(
-				test.context,
-				root,
-				nil, nil,
-				rescanHasher, cache,
-				test.ignores, ignoreCache,
-				behavior.ProbeMode_ProbeModeProbe,
-				test.symbolicLinkMode,
-				nil,
-			)
-
-			// Handle scan failure (which isn't expected at this point).
-			if err != nil {
-				t.Errorf("%s: warm scan failed on %s filesystem: %v",
-					test.description, filesystem.name, err,
-				)
-				cleanup()
-				continue
-			}
-
-			// Propagate executability if the filesystem doesn't preserve it.
-			if !newPreservesExecutability {
-				newSnapshot = PropagateExecutability(nil, test.expected, newSnapshot)
-			}
-
-			// Check scan results.
-			if !newSnapshot.Equal(test.expected, true) {
-				t.Errorf("%s: warm scan result not equal to expected on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newCache == nil {
-				t.Errorf("%s: nil cache returned by warm scan on %s filesystem",
-					test.description, filesystem.name,
-				)
-			} else if !newCache.Equal(cache) {
-				t.Errorf("%s: warm scan cache does not match baseline cache on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if !testingIgnoreCachesEqual(newIgnoreCache, ignoreCache) {
-				t.Errorf("%s: warm scan ignore cache does not match baseline on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newPreservesExecutability != preservesExecutability {
-				t.Errorf("%s: warm scan differed in executability preservation behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newDecomposesUnicode != decomposesUnicode {
-				t.Errorf("%s: warm scan differed in Unicode decomposition behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-
-			// Perform an accelerated scan (without any re-check paths) using
-			// the snapshot as a baseline.
-			newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err = Scan(
-				test.context,
-				root,
-				snapshot, nil,
-				hasher, cache,
-				test.ignores, ignoreCache,
-				behavior.ProbeMode_ProbeModeProbe,
-				test.symbolicLinkMode,
-				nil,
-			)
-
-			// Handle scan failure (which isn't expected at this point).
-			if err != nil {
-				t.Errorf("%s: accelerated scan (without re-check paths) failed on %s filesystem: %v",
-					test.description, filesystem.name, err,
-				)
-				cleanup()
-				continue
-			}
-
-			// Propagate executability if the filesystem doesn't preserve it.
-			if !newPreservesExecutability {
-				newSnapshot = PropagateExecutability(nil, test.expected, newSnapshot)
-			}
-
-			// Check scan results.
-			if !newSnapshot.Equal(test.expected, true) {
-				t.Errorf("%s: accelerated scan (without re-check paths) result not equal to expected on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newCache == nil {
-				t.Errorf("%s: nil cache returned by accelerated scan (without re-check paths) on %s filesystem",
-					test.description, filesystem.name,
-				)
-			} else if !newCache.Equal(cache) {
-				t.Errorf("%s: accelerated scan (without re-check paths) cache does not match baseline cache on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if !testingAcceleratedIgnoreCacheIsSubset(newIgnoreCache, ignoreCache) {
-				t.Errorf("%s: accelerated scan (without re-check paths) ignore cache not a subset of baseline on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newPreservesExecutability != preservesExecutability {
-				t.Errorf("%s: accelerated scan (without re-check paths) differed in executability preservation behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newDecomposesUnicode != decomposesUnicode {
-				t.Errorf("%s: accelerated scan (without re-check paths) differed in Unicode decomposition behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-
-			// If a modifier has been specified, then use it to modify the root
-			// and generate changes to the expected entry. We'll also use those
-			// change paths to populate the recheck path map. If no modifier has
-			// been specified, then just re-use the expected entry but still run
-			// the scan with a (bogus) recheck path.
-			var recheckPaths map[string]bool
-			var modifiedExpected *Entry
-			if test.modifier != nil {
-				if changes, err := test.modifier(root); err != nil {
-					t.Errorf("%s: unable to perform modifications on %s filesystem: %v", test.description, filesystem.name, err)
-					cleanup()
-					continue
-				} else if modifiedExpected, err = Apply(test.expected, changes); err != nil {
-					t.Errorf("%s: unable to apply expected entry changes on %s filesystem: %v", test.description, filesystem.name, err)
-					cleanup()
-					continue
-				} else {
-					recheckPaths = make(map[string]bool, len(changes))
-					for _, change := range changes {
-						recheckPaths[change.Path] = true
+				// Define a cleanup function that will report errors.
+				cleanup := func() {
+					if err := generator.remove(); err != nil {
+						t.Errorf("%s: unable to remove test content on %s filesystem: %v",
+							test.description, filesystem.name, err,
+						)
 					}
 				}
-			} else {
-				recheckPaths = map[string]bool{"non/existent/testing/path": true}
-				modifiedExpected = test.expected
-			}
 
-			// Perform an accelerated scan (with re-check paths) using the
-			// snapshot as a baseline.
-			newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err = Scan(
-				test.context,
-				root,
-				snapshot, recheckPaths,
-				hasher, cache,
-				test.ignores, ignoreCache,
-				behavior.ProbeMode_ProbeModeProbe,
-				test.symbolicLinkMode,
-				nil,
-			)
-
-			// Handle scan failure (which isn't expected at this point).
-			if err != nil {
-				t.Errorf("%s: accelerated scan (with re-check path) failed on %s filesystem: %v",
-					test.description, filesystem.name, err,
+				// Perform a cold scan and handle failure cases.
+				snapshot, preservesExecutability, decomposesUnicode, cache, ignoreCache, err := Scan(
+					test.context,
+					root,
+					nil, nil,
+					hasher, nil,
+					test.ignores, nil,
+					behavior.ProbeMode_ProbeModeProbe,
+					test.symbolicLinkMode,
+					[]string{"*"},
 				)
+
+				if test.expectFailure {
+					if err == nil {
+						t.Errorf("%s: cold scan succeeded unexpectedly on %s filesystem",
+							test.description, filesystem.name,
+						)
+					}
+					cleanup()
+					return
+				} else if err != nil {
+					t.Errorf("%s: cold scan failed on %s filesystem: %v",
+						test.description, filesystem.name, err,
+					)
+					cleanup()
+					return
+				}
+
+				// Propagate executability if the filesystem doesn't preserve it.
+				if !preservesExecutability {
+					snapshot = PropagateExecutability(nil, test.expected, snapshot)
+				}
+
+				// Check scan results.
+				if !snapshot.Equal(test.expected, true) {
+					t.Errorf("%s: cold scan result not equal to expected on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if cache == nil {
+					t.Errorf("%s: nil cache returned by cold scan on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+
+				// Create a proxy hasher to track re-hashing.
+				rescanHasher := &testHashingDetector{
+					hasher, func() {
+						t.Errorf("%s: hashing occurred on warm scan on %s filesystem",
+							test.description, filesystem.name,
+						)
+					},
+				}
+
+				// Perform a warm (but non-accelerated) scan.
+				newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err := Scan(
+					test.context,
+					root,
+					nil, nil,
+					rescanHasher, cache,
+					test.ignores, ignoreCache,
+					behavior.ProbeMode_ProbeModeProbe,
+					test.symbolicLinkMode,
+					[]string{"*"},
+				)
+
+				// Handle scan failure (which isn't expected at this point).
+				if err != nil {
+					t.Errorf("%s: warm scan failed on %s filesystem: %v",
+						test.description, filesystem.name, err,
+					)
+					cleanup()
+					return
+				}
+
+				// Propagate executability if the filesystem doesn't preserve it.
+				if !newPreservesExecutability {
+					newSnapshot = PropagateExecutability(nil, test.expected, newSnapshot)
+				}
+
+				// Check scan results.
+				if !newSnapshot.Equal(test.expected, true) {
+					t.Errorf("%s: warm scan result not equal to expected on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newCache == nil {
+					t.Errorf("%s: nil cache returned by warm scan on %s filesystem",
+						test.description, filesystem.name,
+					)
+				} else if !newCache.Equal(cache) {
+					t.Errorf("%s: warm scan cache does not match baseline cache on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if !testingIgnoreCachesEqual(newIgnoreCache, ignoreCache) {
+					t.Errorf("%s: warm scan ignore cache does not match baseline on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newPreservesExecutability != preservesExecutability {
+					t.Errorf("%s: warm scan differed in executability preservation behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newDecomposesUnicode != decomposesUnicode {
+					t.Errorf("%s: warm scan differed in Unicode decomposition behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+
+				// Perform an accelerated scan (without any re-check paths) using
+				// the snapshot as a baseline.
+				newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err = Scan(
+					test.context,
+					root,
+					snapshot, nil,
+					hasher, cache,
+					test.ignores, ignoreCache,
+					behavior.ProbeMode_ProbeModeProbe,
+					test.symbolicLinkMode,
+					[]string{"*"},
+				)
+
+				// Handle scan failure (which isn't expected at this point).
+				if err != nil {
+					t.Errorf("%s: accelerated scan (without re-check paths) failed on %s filesystem: %v",
+						test.description, filesystem.name, err,
+					)
+					cleanup()
+					return
+				}
+
+				// Propagate executability if the filesystem doesn't preserve it.
+				if !newPreservesExecutability {
+					newSnapshot = PropagateExecutability(nil, test.expected, newSnapshot)
+				}
+
+				// Check scan results.
+				if !newSnapshot.Equal(test.expected, true) {
+					t.Errorf("%s: accelerated scan (without re-check paths) result not equal to expected on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newCache == nil {
+					t.Errorf("%s: nil cache returned by accelerated scan (without re-check paths) on %s filesystem",
+						test.description, filesystem.name,
+					)
+				} else if !newCache.Equal(cache) {
+					t.Errorf("%s: accelerated scan (without re-check paths) cache does not match baseline cache on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if !testingAcceleratedIgnoreCacheIsSubset(newIgnoreCache, ignoreCache) {
+					t.Errorf("%s: accelerated scan (without re-check paths) ignore cache not a subset of baseline on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newPreservesExecutability != preservesExecutability {
+					t.Errorf("%s: accelerated scan (without re-check paths) differed in executability preservation behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newDecomposesUnicode != decomposesUnicode {
+					t.Errorf("%s: accelerated scan (without re-check paths) differed in Unicode decomposition behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+
+				// If a modifier has been specified, then use it to modify the root
+				// and generate changes to the expected entry. We'll also use those
+				// change paths to populate the recheck path map. If no modifier has
+				// been specified, then just re-use the expected entry but still run
+				// the scan with a (bogus) recheck path.
+				var recheckPaths map[string]bool
+				var modifiedExpected *Entry
+				if test.modifier != nil {
+					if changes, err := test.modifier(root); err != nil {
+						t.Errorf("%s: unable to perform modifications on %s filesystem: %v", test.description, filesystem.name, err)
+						cleanup()
+						return
+					} else if modifiedExpected, err = Apply(test.expected, changes); err != nil {
+						t.Errorf("%s: unable to apply expected entry changes on %s filesystem: %v", test.description, filesystem.name, err)
+						cleanup()
+						return
+					} else {
+						recheckPaths = make(map[string]bool, len(changes))
+						for _, change := range changes {
+							recheckPaths[change.Path] = true
+						}
+					}
+				} else {
+					recheckPaths = map[string]bool{"non/existent/testing/path": true}
+					modifiedExpected = test.expected
+				}
+
+				// Perform an accelerated scan (with re-check paths) using the
+				// snapshot as a baseline.
+				newSnapshot, newPreservesExecutability, newDecomposesUnicode, newCache, newIgnoreCache, err = Scan(
+					test.context,
+					root,
+					snapshot, recheckPaths,
+					hasher, cache,
+					test.ignores, ignoreCache,
+					behavior.ProbeMode_ProbeModeProbe,
+					test.symbolicLinkMode,
+					[]string{"*"},
+				)
+
+				// Handle scan failure (which isn't expected at this point).
+				if err != nil {
+					t.Errorf("%s: accelerated scan (with re-check path) failed on %s filesystem: %v",
+						test.description, filesystem.name, err,
+					)
+					cleanup()
+					return
+				}
+
+				// Propagate executability if the filesystem doesn't preserve it.
+				if !newPreservesExecutability {
+					newSnapshot = PropagateExecutability(nil, modifiedExpected, newSnapshot)
+				}
+
+				// Check scan results. Since modifiers can perform arbitrary changes
+				// to the root, we have to restrict certain checks to cases where
+				// the filesystem hasn't been modified. In the case of Unicode
+				// decomposition checks, we have to restrict to the unmodified case
+				// because a modifier might change the root from (say) a directory
+				// to a file, in which case scan won't probe for Unicode behavior.
+				if !newSnapshot.Equal(modifiedExpected, true) {
+					t.Errorf("%s: accelerated scan (with re-check path(s)) result not equal to expected on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newCache == nil {
+					t.Errorf("%s: nil cache returned by accelerated scan (with re-check path(s)) on %s filesystem",
+						test.description, filesystem.name,
+					)
+				} else if test.modifier == nil && !newCache.Equal(cache) {
+					t.Errorf("%s: accelerated scan (with re-check path(s)) cache does not match baseline cache on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if test.modifier == nil && !testingAcceleratedIgnoreCacheIsSubset(newIgnoreCache, ignoreCache) {
+					t.Errorf("%s: accelerated scan (with re-check path(s)) ignore cache not a subset of baseline on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if newPreservesExecutability != preservesExecutability {
+					t.Errorf("%s: accelerated scan (with re-check path(s)) differed in executability preservation behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+				if test.modifier == nil && newDecomposesUnicode != decomposesUnicode {
+					t.Errorf("%s: accelerated scan (with re-check path(s)) differed in Unicode decomposition behavior on %s filesystem",
+						test.description, filesystem.name,
+					)
+				}
+
+				// Perform cleanup.
 				cleanup()
-				continue
-			}
-
-			// Propagate executability if the filesystem doesn't preserve it.
-			if !newPreservesExecutability {
-				newSnapshot = PropagateExecutability(nil, modifiedExpected, newSnapshot)
-			}
-
-			// Check scan results. Since modifiers can perform arbitrary changes
-			// to the root, we have to restrict certain checks to cases where
-			// the filesystem hasn't been modified. In the case of Unicode
-			// decomposition checks, we have to restrict to the unmodified case
-			// because a modifier might change the root from (say) a directory
-			// to a file, in which case scan won't probe for Unicode behavior.
-			if !newSnapshot.Equal(modifiedExpected, true) {
-				t.Errorf("%s: accelerated scan (with re-check path(s)) result not equal to expected on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newCache == nil {
-				t.Errorf("%s: nil cache returned by accelerated scan (with re-check path(s)) on %s filesystem",
-					test.description, filesystem.name,
-				)
-			} else if test.modifier == nil && !newCache.Equal(cache) {
-				t.Errorf("%s: accelerated scan (with re-check path(s)) cache does not match baseline cache on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if test.modifier == nil && !testingAcceleratedIgnoreCacheIsSubset(newIgnoreCache, ignoreCache) {
-				t.Errorf("%s: accelerated scan (with re-check path(s)) ignore cache not a subset of baseline on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if newPreservesExecutability != preservesExecutability {
-				t.Errorf("%s: accelerated scan (with re-check path(s)) differed in executability preservation behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-			if test.modifier == nil && newDecomposesUnicode != decomposesUnicode {
-				t.Errorf("%s: accelerated scan (with re-check path(s)) differed in Unicode decomposition behavior on %s filesystem",
-					test.description, filesystem.name,
-				)
-			}
-
-			// Perform cleanup.
-			cleanup()
+			})
 		}
 	}
 }
