@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mutagen-io/mutagen/pkg/sturdy/debounce"
-	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/mutagen-io/mutagen/pkg/logging"
+	"github.com/mutagen-io/mutagen/pkg/sturdy/debounce"
+	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 )
 
 var (
@@ -28,7 +30,34 @@ func init() {
 	go stateReporter()
 }
 
-func SturdyLogState(s *State) {
+type stateTimestamp struct {
+	Status    Status
+	Timestamp time.Time
+}
+
+var (
+	statesMap   = map[string]*stateTimestamp{}
+	statesGuard = &sync.RWMutex{}
+)
+
+func SturdyLogState(logger *logging.Logger, s *State) {
+	logger = logger.Sublogger("sturdy")
+	logger = logger.Sublogger(fmt.Sprintf("session.%s", s.Session.Version))
+	statesGuard.RLock()
+	ts, exists := statesMap[s.Session.Identifier]
+	statesGuard.RUnlock()
+
+	if exists {
+		logger.Infof("%s: %s -> %s: %s", s.Session.Name, ts.Status, s.Status, time.Since(ts.Timestamp))
+	}
+
+	statesGuard.Lock()
+	statesMap[s.Session.Identifier] = &stateTimestamp{
+		Status:    s.Status,
+		Timestamp: time.Now(),
+	}
+	statesGuard.Unlock()
+
 	// The state is quite chatty, and we don't need to know all intermediate states.
 	// Debouncing here to report the state at most once per second for each session.
 	debouncesMx.Lock()
@@ -111,10 +140,10 @@ func reportState(s *State) error {
 		BetaConnected:  s.BetaConnected,
 		LastError:      s.LastError,
 		// TODO: Differentiate between Scan and Transition problems
-		AlphaProblems:  problems(s.AlphaScanProblems),
-		BetaProblems:   problems(s.BetaScanProblems),
-		Paused:         s.Session.Paused,
-		SturdyVersion:  SturdyVersion,
+		AlphaProblems: problems(s.AlphaScanProblems),
+		BetaProblems:  problems(s.BetaScanProblems),
+		Paused:        s.Session.Paused,
+		SturdyVersion: SturdyVersion,
 	}
 	if s.StagingStatus != nil {
 		ss.StagingStatus = receiverStatus{
