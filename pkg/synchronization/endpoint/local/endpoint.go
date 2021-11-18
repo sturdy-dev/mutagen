@@ -1361,10 +1361,6 @@ func (e *endpoint) Transition(ctx context.Context, transitions []*core.Change) (
 	var paths []string
 	for _, t := range transitions {
 		paths = append(paths, t.Path)
-		log.Printf("transition: %s/%s --> %+v", e.root, t.Path, t)
-	}
-	for _, r := range results {
-		log.Printf("transition result: %+v", r)
 	}
 
 	err := sturdy.SyncTransitions(e.root, paths)

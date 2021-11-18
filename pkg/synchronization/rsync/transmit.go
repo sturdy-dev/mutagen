@@ -3,7 +3,6 @@ package rsync
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/mutagen-io/mutagen/pkg/filesystem"
 )
@@ -31,18 +30,13 @@ func Transmit(root string, paths []string, signatures []*Signature, receiver Rec
 	// Create a transmission object that we can re-use to avoid allocating.
 	transmission := &Transmission{}
 
-	log.Printf("TRANSMIT: transmitting %d files", len(paths))
 	// Handle the requested files.
 	for i, p := range paths {
-		log.Printf("TRANSMIT: transmitting %d: %s", i, p)
-
 		// Open the file. If this fails, it's a non-terminal error, but we
 		// need to inform the receiver. If sending the message fails, that is
 		// a terminal error.
 		file, err := opener.OpenFile(p)
 		if err != nil {
-			log.Printf("TRANSMIT: transmission %s error: %s", p, err)
-
 			*transmission = Transmission{
 				Done:  true,
 				Error: fmt.Errorf("unable to open file: %w", err).Error(),
@@ -60,7 +54,6 @@ func Transmit(root string, paths []string, signatures []*Signature, receiver Rec
 		// again.
 		var transmitError error
 		transmit := func(o *Operation) error {
-			log.Printf("TRANSMIT: transmitting %s delta", p)
 			*transmission = Transmission{Operation: o}
 			transmitError = receiver.Receive(transmission)
 			return transmitError
@@ -89,8 +82,6 @@ func Transmit(root string, paths []string, signatures []*Signature, receiver Rec
 			receiver.finalize()
 			return fmt.Errorf("unable to send done message: %w", err)
 		}
-
-		log.Printf("TRANSMIT: transmission done (%d): %s", i, p)
 	}
 
 	// Ensure that the receiver is finalized.

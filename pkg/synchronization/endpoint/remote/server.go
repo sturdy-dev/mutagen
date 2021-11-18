@@ -151,27 +151,22 @@ func (s *endpointServer) serve() error {
 
 		// Handle the request based on type.
 		if request.Poll != nil {
-			log.Printf("POLL: %s", request.Poll)
 			if err := s.servePoll(request.Poll); err != nil {
 				return fmt.Errorf("unable to serve poll request: %w", err)
 			}
 		} else if request.Scan != nil {
-			log.Printf("SCAN: %s", request.Scan)
 			if err := s.serveScan(request.Scan); err != nil {
 				return fmt.Errorf("unable to serve scan request: %w", err)
 			}
 		} else if request.Stage != nil {
-			log.Printf("STAGAE: %s", request.Stage)
 			if err := s.serveStage(request.Stage); err != nil {
 				return fmt.Errorf("unable to serve stage request: %w", err)
 			}
 		} else if request.Supply != nil {
-			log.Printf("SUPPLY: %s", request.Supply)
 			if err := s.serveSupply(request.Supply); err != nil {
 				return fmt.Errorf("unable to serve supply request: %w", err)
 			}
 		} else if request.Transition != nil {
-			log.Printf("TRANSITION: %s", request.Transition)
 			if err := s.serveTransition(request.Transition); err != nil {
 				return fmt.Errorf("unable to serve transition request: %w", err)
 			}
