@@ -32,7 +32,11 @@ require (
 )
 
 require (
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/gofrs/flock v0.8.1
+	github.com/golang/protobuf v1.5.2
+)
+
+require (
 	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect

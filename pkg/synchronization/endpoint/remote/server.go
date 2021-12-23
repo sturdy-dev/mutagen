@@ -12,6 +12,7 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/encoding"
 	"github.com/mutagen-io/mutagen/pkg/filesystem"
 	"github.com/mutagen-io/mutagen/pkg/logging"
+	"github.com/mutagen-io/mutagen/pkg/sturdy"
 	"github.com/mutagen-io/mutagen/pkg/synchronization"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/endpoint/local"
@@ -96,7 +97,7 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 		request.Version,
 		request.Configuration,
 		request.Alpha,
-		nil,
+		sturdy.WithLock(nil),
 	)
 	if err != nil {
 		err = fmt.Errorf("unable to create underlying endpoint: %w", err)

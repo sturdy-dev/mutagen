@@ -192,6 +192,8 @@ type endpoint struct {
 	// previousAllows is the previously known state for the allows list
 	// Can be used as a fallback if fetching a new allow list fails
 	previousAllows []string
+	// sturdyMutex is used to synchronize filesystem operations with the sturdy server.
+	sturdyMutex sturdy.Mutex
 }
 
 // NewEndpoint creates a new local endpoint instance using the specified session
@@ -426,7 +428,8 @@ func NewEndpoint(
 			version.Hasher(),
 			maximumStagingFileSize,
 		),
-		labels: labels,
+		labels:      labels,
+		sturdyMutex: sturdy.CreateMutex(root, labels),
 	}
 
 	// Start the cache saving Goroutine and monitor for its completion.
@@ -1096,6 +1099,20 @@ func (e *endpoint) Scan(ctx context.Context, _ *core.Entry, full bool) (*core.En
 	e.scanLock.Lock()
 	defer e.scanLock.Unlock()
 
+	if err := e.sturdyMutex.RLock(); err != nil {
+		e.logger.Sublogger("sturdy").Errorf("failed to acquire read lock: %s", err)
+	} else {
+		e.logger.Sublogger("sturdy").Debug("acquired read lock")
+	}
+
+	defer func() {
+		if err := e.sturdyMutex.RUnlock(); err != nil {
+			e.logger.Sublogger("sturdy").Errorf("failed to release read lock: %s", err)
+		} else {
+			e.logger.Sublogger("sturdy").Debug("released read lock")
+		}
+	}()
+
 	// Before attempting to perform a scan, check for any cache write errors
 	// that may have occurred during background cache writes. If we see any
 	// error, then we skip scanning and report them here.
@@ -1192,6 +1209,19 @@ func (e *endpoint) Stage(paths []string, digests [][]byte) ([]string, []*rsync.S
 	// and to generate the reverse lookup map.
 	e.scanLock.Lock()
 
+	if err := e.sturdyMutex.RLock(); err != nil {
+		e.logger.Sublogger("sturdy").Errorf("failed to acquire read lock: %s", err)
+	} else {
+		e.logger.Sublogger("sturdy").Debug("acquired read lock")
+	}
+	defer func() {
+		if err := e.sturdyMutex.RUnlock(); err != nil {
+			e.logger.Sublogger("sturdy").Errorf("failed to release read lock: %s", err)
+		} else {
+			e.logger.Sublogger("sturdy").Debug("released read lock")
+		}
+	}()
+
 	// Verify that we've performed a scan since the last staging operation, that
 	// way our count check is valid. If we haven't, then the controller is
 	// either malfunctioning or malicious.
@@ -1283,6 +1313,19 @@ func (e *endpoint) Stage(paths []string, digests [][]byte) ([]string, []*rsync.S
 
 // Supply implements the supply method for local endpoints.
 func (e *endpoint) Supply(paths []string, signatures []*rsync.Signature, receiver rsync.Receiver) error {
+	if err := e.sturdyMutex.RLock(); err != nil {
+		e.logger.Sublogger("sturdy").Errorf("failed to acquire read lock: %s", err)
+	} else {
+		e.logger.Sublogger("sturdy").Debug("acquired read lock")
+	}
+	defer func() {
+		if err := e.sturdyMutex.RUnlock(); err != nil {
+			e.logger.Sublogger("sturdy").Errorf("failed to release read lock: %s", err)
+		} else {
+			e.logger.Sublogger("sturdy").Debug("released read lock")
+		}
+	}()
+
 	res := rsync.Transmit(e.root, paths, signatures, receiver)
 
 	// This is a Supply request, and not a Transition.
@@ -1306,6 +1349,19 @@ func (e *endpoint) Transition(ctx context.Context, transitions []*core.Change) (
 	// Grab the scan lock and defer its release.
 	e.scanLock.Lock()
 	defer e.scanLock.Unlock()
+
+	if err := e.sturdyMutex.Lock(); err != nil {
+		e.logger.Sublogger("sturdy").Errorf("failed to acquire write lock: %s", err)
+	} else {
+		e.logger.Sublogger("sturdy").Debug("acquired write lock")
+	}
+	defer func() {
+		if err := e.sturdyMutex.Unlock(); err != nil {
+			e.logger.Sublogger("sturdy").Errorf("failed to release write lock: %s", err)
+		} else {
+			e.logger.Sublogger("sturdy").Debug("released write lock")
+		}
+	}()
 
 	// Verify that we've performed a scan since the last transition operation,
 	// that way our count check is valid. If we haven't, then the controller is
