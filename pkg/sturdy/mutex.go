@@ -1,7 +1,10 @@
 package sturdy
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/gofrs/flock"
 )
@@ -37,24 +40,76 @@ func (noMutex) RUnlock() error {
 	return nil
 }
 
-type flockMutex struct {
-	flck *flock.Flock
+type fileLock struct {
+	mu      sync.RWMutex // lock within this process
+	lock    *flock.Flock // lock between processes
+	countMx sync.Mutex
+
+	count uint
 }
 
-func (f *flockMutex) Lock() error {
-	return f.flck.Lock()
+func New(filename string) *fileLock {
+	return &fileLock{
+		lock: flock.New(filename),
+	}
 }
 
-func (f *flockMutex) Unlock() error {
-	return f.flck.Unlock()
+func (fl *fileLock) Lock() error {
+	fl.mu.Lock()
+	if err := fl.lock.Lock(); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
-func (f *flockMutex) RLock() error {
-	return f.flck.RLock()
+func (fl *fileLock) Unlock() error {
+	defer fl.mu.Unlock()
+	if err := fl.lock.Unlock(); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
-func (f *flockMutex) RUnlock() error {
-	return f.flck.Unlock()
+func (fl *fileLock) RLock() error {
+	fl.countMx.Lock()
+	fl.count++
+	fl.countMx.Unlock()
+
+	fl.mu.RLock()
+	if err := fl.lock.RLock(); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func (fl *fileLock) RUnlock() error {
+	fl.countMx.Lock()
+	fl.count--
+	if fl.count == 0 {
+		if err := fl.lock.Unlock(); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				fl.mu.RUnlock()
+				fl.countMx.Unlock()
+				return nil
+			}
+			fl.mu.RUnlock()
+			fl.countMx.Unlock()
+			return err
+
+		}
+	}
+	fl.mu.RUnlock()
+	fl.countMx.Unlock()
+	return nil
 }
 
 func CreateMutex(roots string, labels map[string]string) Mutex {
@@ -64,7 +119,7 @@ func CreateMutex(roots string, labels map[string]string) Mutex {
 	if !useLock(labels) {
 		return noMutex{}
 	}
-	return &flockMutex{
-		flck: flock.New(filepath.Join(roots, lockFile)),
+	return &fileLock{
+		lock: flock.New(filepath.Join(roots, lockFile)),
 	}
 }
