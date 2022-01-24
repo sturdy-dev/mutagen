@@ -30,10 +30,17 @@ func getAPIAddr(ctx context.Context) string {
 	proto := labels["sturdyApiProto"]
 	host := labels["sturdyApiHost"]
 	port := labels["sturdyApiHostPort"]
+	prefix := labels["sturdyApiPrefix"]
 	if port == "" {
-		return fmt.Sprintf("%s://%s", proto, host)
+		if prefix == "" {
+			return fmt.Sprintf("%s://%s", proto, host)
+		}
+		return fmt.Sprintf("%s://%s/%s", proto, host, prefix)
 	}
-	return fmt.Sprintf("%s://%s:%s", proto, host, port)
+	if prefix == "" {
+		return fmt.Sprintf("%s://%s:%s", proto, host, port)
+	}
+	return fmt.Sprintf("%s://%s:%s/%s", proto, host, port, prefix)
 }
 
 func Post(endpoint string, request, response interface{}) error {
