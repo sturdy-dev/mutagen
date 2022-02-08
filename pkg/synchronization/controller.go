@@ -15,6 +15,7 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/mutagen"
 	"github.com/mutagen-io/mutagen/pkg/prompting"
 	"github.com/mutagen-io/mutagen/pkg/state"
+	sturdycontext "github.com/mutagen-io/mutagen/pkg/sturdy/context"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
 	"github.com/mutagen-io/mutagen/pkg/url"
@@ -468,7 +469,7 @@ func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockH
 	// Attempt to connect to alpha.
 	c.stateLock.Lock()
 	c.state.Status = Status_ConnectingAlpha
-	SturdyLogState(c.logger, c.state)
+	SturdyLogState(ctx, c.logger, c.state)
 	c.stateLock.Unlock()
 	alpha, alphaConnectErr := connect(
 		ctx,
@@ -488,7 +489,7 @@ func (c *controller) resume(ctx context.Context, prompter string, lifecycleLockH
 	// Attempt to connect to beta.
 	c.stateLock.Lock()
 	c.state.Status = Status_ConnectingBeta
-	SturdyLogState(c.logger, c.state)
+	SturdyLogState(ctx, c.logger, c.state)
 	c.stateLock.Unlock()
 	beta, betaConnectErr := connect(
 		ctx,
@@ -703,7 +704,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 			if alpha == nil {
 				c.stateLock.Lock()
 				c.state.Status = Status_ConnectingAlpha
-				SturdyLogState(c.logger, c.state)
+				SturdyLogState(ctx, c.logger, c.state)
 				c.stateLock.Unlock()
 				alpha, _ = connect(
 					ctx,
@@ -733,7 +734,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 			if beta == nil {
 				c.stateLock.Lock()
 				c.state.Status = Status_ConnectingBeta
-				SturdyLogState(c.logger, c.state)
+				SturdyLogState(ctx, c.logger, c.state)
 				c.stateLock.Unlock()
 				beta, _ = connect(
 					ctx,
@@ -776,6 +777,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 		c.stateLock.UnlockWithoutNotify()
 
 		// Perform synchronization.
+		ctx = sturdycontext.WithLabels(ctx, c.session.Labels)
 		err := c.synchronize(ctx, alpha, beta)
 
 		// Indicate that the synchronization loop is no longer synchronizing.
@@ -806,7 +808,7 @@ func (c *controller) run(ctx context.Context, alpha, beta Endpoint) {
 			Session:   c.session,
 			LastError: err.Error(),
 		}
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 
 		// When synchronization fails, we generally want to restart it as
@@ -900,7 +902,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 			// Update status to watching.
 			c.stateLock.Lock()
 			c.state.Status = Status_Watching
-			SturdyLogState(c.logger, c.state)
+			SturdyLogState(ctx, c.logger, c.state)
 			c.stateLock.Unlock()
 
 			// Create a polling context that we can cancel. We don't make it a
@@ -996,7 +998,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// (warm) re-scan rather than using acceleration.
 		c.stateLock.Lock()
 		c.state.Status = Status_Scanning
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 		forceFullScan := flushRequest != nil
 		var αSnapshot, βSnapshot *core.Entry
@@ -1030,7 +1032,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 			} else {
 				c.stateLock.Lock()
 				c.state.LastError = αScanErr.Error()
-				SturdyLogState(c.logger, c.state)
+				SturdyLogState(ctx, c.logger, c.state)
 				c.stateLock.Unlock()
 			}
 		}
@@ -1041,7 +1043,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 			} else {
 				c.stateLock.Lock()
 				c.state.LastError = βScanErr.Error()
-				SturdyLogState(c.logger, c.state)
+				SturdyLogState(ctx, c.logger, c.state)
 				c.stateLock.Unlock()
 			}
 		}
@@ -1063,7 +1065,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 				// Update status to waiting for rescan.
 				c.stateLock.Lock()
 				c.state.Status = Status_WaitingForRescan
-				SturdyLogState(c.logger, c.state)
+				SturdyLogState(ctx, c.logger, c.state)
 				c.stateLock.Unlock()
 
 				// Wait before trying to rescan, but watch for cancellation.
@@ -1092,7 +1094,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		c.state.AlphaScanProblems = αSnapshot.Problems()
 		c.state.BetaScanProblems = βSnapshot.Problems()
 		c.state.Status = Status_Reconciling
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 
 		// If one side preserves executability and the other does not, then
@@ -1114,7 +1116,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		if oneEndpointEmptiedRoot(ancestor, αSnapshot, βSnapshot) {
 			c.stateLock.Lock()
 			c.state.Status = Status_HaltedOnRootEmptied
-			SturdyLogState(c.logger, c.state)
+			SturdyLogState(ctx, c.logger, c.state)
 			c.stateLock.Unlock()
 			return errHaltedForSafety
 		}
@@ -1130,7 +1132,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// Store conflicts that arose during reconciliation.
 		c.stateLock.Lock()
 		c.state.Conflicts = conflicts
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 
 		// Check if a root deletion operation is being propagated. This can be
@@ -1142,7 +1144,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		if containsRootDeletion(αTransitions) || containsRootDeletion(βTransitions) {
 			c.stateLock.Lock()
 			c.state.Status = Status_HaltedOnRootDeletion
-			SturdyLogState(c.logger, c.state)
+			SturdyLogState(ctx, c.logger, c.state)
 			c.stateLock.Unlock()
 			return errHaltedForSafety
 		}
@@ -1154,7 +1156,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		if containsRootTypeChange(αTransitions) || containsRootTypeChange(βTransitions) {
 			c.stateLock.Lock()
 			c.state.Status = Status_HaltedOnRootTypeChange
-			SturdyLogState(c.logger, c.state)
+			SturdyLogState(ctx, c.logger, c.state)
 			c.stateLock.Unlock()
 			return errHaltedForSafety
 		}
@@ -1163,7 +1165,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		monitor := func(status *rsync.ReceiverStatus) error {
 			c.stateLock.Lock()
 			c.state.StagingStatus = status
-			SturdyLogState(c.logger, c.state)
+			SturdyLogState(ctx, c.logger, c.state)
 			c.stateLock.Unlock()
 			return nil
 		}
@@ -1171,7 +1173,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// Stage files on alpha.
 		c.stateLock.Lock()
 		c.state.Status = Status_StagingAlpha
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 		if paths, digests := core.TransitionDependencies(αTransitions); len(paths) > 0 {
 			filteredPaths, signatures, receiver, err := alpha.Stage(paths, digests)
@@ -1193,7 +1195,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// Stage files on beta.
 		c.stateLock.Lock()
 		c.state.Status = Status_StagingBeta
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 		if paths, digests := core.TransitionDependencies(βTransitions); len(paths) > 0 {
 			filteredPaths, signatures, receiver, err := beta.Stage(paths, digests)
@@ -1218,7 +1220,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// been updated.
 		c.stateLock.Lock()
 		c.state.Status = Status_Transitioning
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 		var αResults, βResults []*core.Entry
 		var αProblems, βProblems []*core.Problem
@@ -1263,7 +1265,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		c.state.Status = Status_Saving
 		c.state.AlphaTransitionProblems = αProblems
 		c.state.BetaTransitionProblems = βProblems
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 		ancestorChanges = append(ancestorChanges, αChanges...)
 		ancestorChanges = append(ancestorChanges, βChanges...)
@@ -1315,7 +1317,7 @@ func (c *controller) synchronize(ctx context.Context, alpha, beta Endpoint) erro
 		// Increment the synchronization cycle count.
 		c.stateLock.Lock()
 		c.state.SuccessfulSynchronizationCycles++
-		SturdyLogState(c.logger, c.state)
+		SturdyLogState(ctx, c.logger, c.state)
 		c.stateLock.Unlock()
 
 		// If a flush request triggered this synchronization cycle, then tell it

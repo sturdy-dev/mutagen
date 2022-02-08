@@ -81,7 +81,7 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 	}
 
 	// Validate that the user has access to this path
-	if err := sturdyValidateRoot(request.Root, sturdyApiValidateRoot); err != nil {
+	if err := sturdyValidateRoot(context.Background(), request.Root, sturdyApiValidateRoot); err != nil {
 		err := fmt.Errorf("invalid view or codebase: %w", err)
 		encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
 		log.Println(err)
@@ -114,7 +114,7 @@ func ServeEndpoint(logger *logging.Logger, stream io.ReadWriteCloser) error {
 	// Ping view to indicate connectedness
 	done := make(chan bool)
 	go func() {
-		if err := sturdyPingView(request.Root, sturdyApiValidateRoot, done); err != nil {
+		if err := sturdyPingView(context.Background(), request.Root, sturdyApiValidateRoot, done); err != nil {
 			err := fmt.Errorf("invalid view or codebase: %w", err)
 			encoder.Encode(&InitializeSynchronizationResponse{Error: err.Error()})
 			log.Println(err)

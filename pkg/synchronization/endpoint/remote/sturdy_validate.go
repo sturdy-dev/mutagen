@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -11,23 +12,22 @@ import (
 	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
 )
 
-type sturdyValidateViewer func(codebaseID, viewID string, isNewConnection bool) error
+type sturdyValidateViewer func(ctx context.Context, codebaseID, viewID string, isNewConnection bool) error
 
-func sturdyValidateRoot(root string, sturdyValFunc sturdyValidateViewer) error {
+func sturdyValidateRoot(ctx context.Context, root string, sturdyValFunc sturdyValidateViewer) error {
 	codebaseID, viewID, err := sturdy.ParseCodebaseViewPath(root)
 	if err != nil {
 		return fmt.Errorf("invalid path")
 	}
 
-	err = sturdyValFunc(codebaseID, viewID, true)
-	if err != nil {
+	if err := sturdyValFunc(ctx, codebaseID, viewID, true); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func sturdyApiValidateRoot(codebaseID, viewID string, isNewConnection bool) error {
+func sturdyApiValidateRoot(ctx context.Context, codebaseID, viewID string, isNewConnection bool) error {
 	type validateRequest struct {
 		CodebaseID      string `json:"codebase_id"`
 		ViewID          string `json:"view_id"`
@@ -42,20 +42,19 @@ func sturdyApiValidateRoot(codebaseID, viewID string, isNewConnection bool) erro
 	}
 
 	var res struct{}
-	err := api.Post("/v3/mutagen/validate-view", validateRequest{
+	if err := api.Post(ctx, "/v3/mutagen/validate-view", validateRequest{
 		UserID:          userID,
 		ViewID:          viewID,
 		CodebaseID:      codebaseID,
 		IsNewConnection: isNewConnection,
-	}, &res)
-	if err != nil {
+	}, &res); err != nil {
 		return fmt.Errorf("validate view failed: %w", err)
 	}
 
 	return nil
 }
 
-func sturdyPingView(root string, sturdyValFunc sturdyValidateViewer, done chan bool) error {
+func sturdyPingView(ctx context.Context, root string, sturdyValFunc sturdyValidateViewer, done chan bool) error {
 	codebaseID, viewID, err := sturdy.ParseCodebaseViewPath(root)
 	if err != nil {
 		return fmt.Errorf("invalid path")
@@ -70,8 +69,8 @@ func sturdyPingView(root string, sturdyValFunc sturdyValidateViewer, done chan b
 		case <-done:
 			return nil
 		case <-tick:
-			err = sturdyValFunc(codebaseID, viewID, false)
-			if err != nil {
+			if err := sturdyValFunc(ctx, codebaseID, viewID, false); err != nil {
+				return err
 				log.Printf("failed to ping view: %s", err)
 			}
 		}

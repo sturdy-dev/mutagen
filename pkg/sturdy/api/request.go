@@ -43,9 +43,10 @@ func getAPIAddr(ctx context.Context) string {
 	return fmt.Sprintf("%s://%s:%s/%s", proto, host, port, prefix)
 }
 
-func Post(endpoint string, request, response interface{}) error {
+func Post(ctx context.Context, endpoint string, request, response interface{}) error {
+	apiAddr := getAPIAddr(ctx)
 	if apiAddr == "" {
-		return fmt.Errorf("STURDY_API_ADDR is not defined")
+		return fmt.Errorf("api address is not defined")
 	}
 
 	data, err := json.Marshal(request)
@@ -83,11 +84,6 @@ func Post(endpoint string, request, response interface{}) error {
 }
 
 func Get(ctx context.Context, endpoint string, response interface{}) error {
-	apiAddr := getAPIAddr(ctx)
-	if apiAddr == "" {
-		return fmt.Errorf("api address is not defined")
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiAddr+endpoint, &bytes.Reader{})
 	if err != nil {
 		return fmt.Errorf("could not make request: %w", err)

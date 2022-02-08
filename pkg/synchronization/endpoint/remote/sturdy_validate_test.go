@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"fmt"
 	"testing"
 )
@@ -19,7 +20,7 @@ func TestSturdyValidateRoot(t *testing.T) {
 		{"/etc/foo/bar", fmt.Errorf("invalid path")},
 	}
 
-	validateCodebaseView := func(codebaseID, viewID string, isNewConnection bool) error {
+	validateCodebaseView := func(_ context.Context, codebaseID, viewID string, isNewConnection bool) error {
 		if codebaseID == "foo" && viewID == "bar" {
 			return nil
 		}
@@ -28,7 +29,7 @@ func TestSturdyValidateRoot(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
-			res := sturdyValidateRoot(tc.in, validateCodebaseView)
+			res := sturdyValidateRoot(context.TODO(), tc.in, validateCodebaseView)
 			if res == nil && tc.expected == nil {
 				return
 			}

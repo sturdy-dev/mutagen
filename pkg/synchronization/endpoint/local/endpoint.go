@@ -1330,8 +1330,7 @@ func (e *endpoint) Supply(paths []string, signatures []*rsync.Signature, receive
 
 	// This is a Supply request, and not a Transition.
 	// TODO: Rename the API
-	err := sturdy.SyncTransitions(e.root, paths)
-	if err != nil {
+	if err := sturdy.SyncTransitions(context.Background(), e.root, paths); err != nil {
 		log.Println(err)
 		// TODO: how should we deal with failures?
 	}
@@ -1419,8 +1418,7 @@ func (e *endpoint) Transition(ctx context.Context, transitions []*core.Change) (
 		paths = append(paths, t.Path)
 	}
 
-	err := sturdy.SyncTransitions(e.root, paths)
-	if err != nil {
+	if err := sturdy.SyncTransitions(ctx, e.root, paths); err != nil {
 		log.Println(err)
 		// TODO: how should we deal with failures?
 	}

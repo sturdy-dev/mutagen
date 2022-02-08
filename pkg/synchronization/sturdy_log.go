@@ -1,16 +1,15 @@
 package synchronization
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
 	"github.com/mutagen-io/mutagen/pkg/logging"
+	"github.com/mutagen-io/mutagen/pkg/sturdy/api"
+	sturdycontext "github.com/mutagen-io/mutagen/pkg/sturdy/context"
 	"github.com/mutagen-io/mutagen/pkg/sturdy/debounce"
 	"github.com/mutagen-io/mutagen/pkg/synchronization/core"
 )
@@ -31,6 +30,7 @@ func init() {
 }
 
 type stateTimestamp struct {
+	Labels    map[string]string
 	Status    Status
 	Timestamp time.Time
 }
@@ -40,7 +40,7 @@ var (
 	statesGuard = &sync.RWMutex{}
 )
 
-func SturdyLogState(logger *logging.Logger, s *State) {
+func SturdyLogState(ctx context.Context, logger *logging.Logger, s *State) {
 	logger = logger.Sublogger("sturdy")
 	logger = logger.Sublogger(fmt.Sprintf("session.%s", s.Session.Version))
 	statesGuard.RLock()
@@ -51,11 +51,19 @@ func SturdyLogState(logger *logging.Logger, s *State) {
 		logger.Infof("%s: %s -> %s: %s", s.Session.Name, ts.Status, s.Status, time.Since(ts.Timestamp))
 	}
 
-	statesGuard.Lock()
-	statesMap[s.Session.Identifier] = &stateTimestamp{
+	st := &stateTimestamp{
 		Status:    s.Status,
 		Timestamp: time.Now(),
 	}
+	labels, ok := sturdycontext.Labels(ctx)
+	if ok {
+		st.Labels = labels
+	} else {
+		st.Labels = make(map[string]string)
+	}
+
+	statesGuard.Lock()
+	statesMap[s.Session.Identifier] = st
 	statesGuard.Unlock()
 
 	// The state is quite chatty, and we don't need to know all intermediate states.
@@ -152,45 +160,13 @@ func reportState(s *State) error {
 			Total:    s.StagingStatus.Total,
 		}
 	}
-	data, err := json.Marshal(ss)
-	if err != nil {
-		return err
-	}
 
-	// Build connection url from the session labels
-	// Default to https://api.getsturdy.com:443 for backwards compatability with sessions created before sturdy v0.5.18
-	var proto = "https"
-	var host = "api.getsturdy.com"
-	var port = "443"
-	if lHost, ok := s.Session.Labels["sturdyApiHost"]; ok {
-		host = lHost
-	}
-	if lPort, ok := s.Session.Labels["sturdyApiHostPort"]; ok && len(lPort) > 0 {
-		port = lPort
-		if lPort == "443" {
-			proto = "https"
-		} else {
-			proto = "http"
-		}
-	}
-
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second)
+	ctx := sturdycontext.WithLabels(context.Background(), s.Session.Labels)
+	ctx, cancelFunc := context.WithTimeout(ctx, time.Second)
 	defer cancelFunc()
 
-	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s://%s:%s/v3/mutagen/update-status", proto, host, port), bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("unexpected response code: %d", resp.StatusCode)
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
+	if err := api.Post(ctx, "/v3/mutagen/update-status", ss, &struct{}{}); err != nil {
+		return fmt.Errorf("unexpected response: %w", err)
 	}
 	return nil
 }
